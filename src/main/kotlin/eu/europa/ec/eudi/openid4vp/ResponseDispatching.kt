@@ -15,6 +15,8 @@
  */
 package eu.europa.ec.eudi.openid4vp
 
+import eu.europa.ec.eudi.openid4vp.ResolvedRequestObject.*
+import kotlinx.serialization.json.JsonObject
 import java.net.URI
 
 /**
@@ -73,9 +75,9 @@ sealed interface DispatchOutcome : java.io.Serializable {
 
 /**
  * This interface assembles an appropriate authorization response given a [request][ResolvedRequestObject]
- * and holder's [consensus][Consensus] and then dispatches it to the verifier
+ * and holder's [consensus][Consensus] and then dispatches it to the verifier over HTTP channel
  */
-interface Dispatcher {
+interface DispatcherOverHttp {
 
     /**
      * Assembles an appropriate authorization response given a [request][request]
@@ -106,6 +108,7 @@ interface Dispatcher {
             is ResponseMode.QueryJwt -> encodeRedirectURI(request, consensus, encryptionParameters)
             is ResponseMode.Fragment -> encodeRedirectURI(request, consensus, null)
             is ResponseMode.FragmentJwt -> encodeRedirectURI(request, consensus, encryptionParameters)
+            else -> error("Unsupported response mode: ${request.responseMode} for dispatching over HTTP")
         }
 
     /**
@@ -145,4 +148,17 @@ interface Dispatcher {
         consensus: Consensus,
         encryptionParameters: EncryptionParameters? = null,
     ): DispatchOutcome.RedirectURI
+}
+
+/**
+ * Given a [request][ResolvedRequestObject] send over DC API chanel and holder's [consensus][Consensus] this interface
+ * assembles an appropriate authorization response.
+ */
+interface DispatcherOverDCApi {
+
+    suspend fun assembleResponse(
+        request: ResolvedRequestObject,
+        consensus: Consensus,
+        encryptionParameters: EncryptionParameters? = null,
+    ): JsonObject
 }
