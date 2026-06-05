@@ -193,7 +193,7 @@ data class VerifierId(
                     ClientIdPrefix.VerifierAttestation -> VerifierId(prefix, originalClientId)
                     ClientIdPrefix.X509SanDns -> VerifierId(prefix, originalClientId)
                     ClientIdPrefix.X509Hash -> VerifierId(prefix, originalClientId)
-                    ClientIdPrefix.ORIGIN -> VerifierId(prefix, originalClientId)
+                    ClientIdPrefix.ORIGIN -> invalid("'${ClientIdPrefix.ORIGIN}' cannot be used as a Client ID prefix")
                     null -> preRegistered()
                 }
             }

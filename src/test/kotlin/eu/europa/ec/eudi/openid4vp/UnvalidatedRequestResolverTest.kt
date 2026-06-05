@@ -894,6 +894,24 @@ class UnvalidatedRequestResolverTest {
         }
 
         @Test
+        fun `client_id is not mandatory to exist in unsigned request over DC API`() = runTest {
+            val requestData = buildJsonObject {
+                put("response_mode", "dc_api")
+                put("nonce", "n-0S6_WzA2Mj")
+                put("dcql_query", jsonSupport.decodeFromString<JsonObject>(dcqlQuery))
+                put("client_metadata", jsonSupport.decodeFromString<JsonObject>(clientMetadata))
+            }
+            val resolution = resolver.resolveRequestObject(
+                OpenId4VPSpec.DC_API_EXCHANGE_PROTOCOL_UNSIGNED,
+                "test_origin",
+                requestData,
+            )
+            val request = resolution.assertIsSuccess()
+            assertIs<Client.Origin>(request.client)
+            assertEquals("test_origin", request.client.clientId)
+        }
+
+        @Test
         fun `verifier attestations are parsed correctly`() = runTest {
             val requestData = buildJsonObject {
                 put("response_mode", "dc_api")

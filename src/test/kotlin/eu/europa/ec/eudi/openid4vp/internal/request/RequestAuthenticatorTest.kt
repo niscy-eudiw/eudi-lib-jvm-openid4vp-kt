@@ -67,6 +67,14 @@ class ClientAuthenticatorOverHTTPTest {
                 clientAuthenticator.authenticateClientOverHttp(request)
             }
         }
+
+        @Test
+        fun `if 'origin' is used as a client id prefix, authentication fails`() = runTest {
+            val request = UnvalidatedRequestObject(clientId = "origin:test_client_id").unsigned()
+            assertFailsWithError<RequestValidationError.InvalidClientIdPrefix> {
+                clientAuthenticator.authenticateClientOverHttp(request)
+            }
+        }
     }
 
     @DisplayName("when handling a request with `redirect_uri` prefix")
@@ -432,7 +440,6 @@ class RequestAuthenticatorOverDCApiTest {
     inner class AuthenticatorCommonTest {
 
         private val clientAuthenticator = ClientAuthenticator(cfg)
-        private val requestAuthenticator = RequestAuthenticator(cfg, createHttpClient())
 
         @Test
         fun `if request is unsinged the resolved client must be Origin`() = runTest {
