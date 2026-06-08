@@ -87,16 +87,13 @@ internal class RequestAuthenticator(openId4VPConfig: OpenId4VPConfig, httpClient
                 requireNotNull(signedJwt) {
                     "Expected a signed request but was not."
                 }
-                val requestObject = when (request) {
-                    is ReceivedRequest.Signed ->
-                        signedJwt.requestObject()
-                    is ReceivedRequest.MultiSigned ->
-                        signedJwt.requestObject()
-                            .extendWithHeaderAttributes(signedJwt.header)
-                    else -> error("Cannot happen")
-                }
                 with(signatureVerifier) {
                     verifySignature(client, signedJwt)
+                }
+                val requestObject = when (request) {
+                    is ReceivedRequest.Signed -> signedJwt.requestObject()
+                    is ReceivedRequest.MultiSigned -> signedJwt.requestObject().extendWithHeaderAttributes(signedJwt.header)
+                    else -> error("Cannot happen")
                 }
                 AuthenticatedRequest(client, requestObject)
             }
@@ -193,7 +190,7 @@ internal class ClientAuthenticator(private val openId4VPConfig: OpenId4VPConfig)
             ?: throw NoMatchingClientPrefixInMultiSignedRequest.asException()
 
     private fun JwsJson.Flattened.clientIdFromProtectedHeader(): String? {
-        val protectedHeader: JsonObject? = protected?.decodeAs()
+        val protectedHeader = protected?.decodeAs<JsonObject>()
         return protectedHeader?.get("client_id")?.let {
             ensure(it is JsonPrimitive) { error("Invalid client_id") }
             it.content
@@ -453,7 +450,9 @@ internal fun SignedJWT.requestObject(): UnvalidatedRequestObject =
 private fun UnvalidatedRequestObject.extendWithHeaderAttributes(header: JWSHeader?): UnvalidatedRequestObject =
     header?.getCustomParam(OpenId4VPSpec.VERIFIER_INFO)
         ?.let { verifierInfo ->
-            ensure(verifierInfo is JsonObject) { error("Invalid verifier_info. Expected JsonObject but was ${verifierInfo::class}") }
+            ensure(verifierInfo is JsonObject) {
+                error("Invalid verifier_info. Expected JsonObject but was ${verifierInfo::class}")
+            }
             val verifierInfo = jsonSupport.decodeFromString<VerifierInfoTO>(JSONObjectUtils.toJSONString(verifierInfo))
             this.copy(verifierInfo = verifierInfo)
         } ?: this

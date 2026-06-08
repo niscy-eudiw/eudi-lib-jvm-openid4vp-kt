@@ -38,6 +38,8 @@ import eu.europa.ec.eudi.openid4vp.internal.jsonSupport
 import eu.europa.ec.eudi.openid4vp.internal.request.DefaultRequestResolverOverDCApi
 import eu.europa.ec.eudi.openid4vp.internal.request.DefaultRequestResolverOverHttp
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedClientMetaData
+import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedRequestObject
+import eu.europa.ec.eudi.openid4vp.internal.request.randomKey
 import io.ktor.client.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.serialization.kotlinx.json.*
@@ -46,6 +48,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.MissingFieldException
 import kotlinx.serialization.SerializationException
+import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.*
 import org.apache.http.NameValuePair
 import org.apache.http.client.utils.URIBuilder
@@ -137,6 +140,8 @@ class UnvalidatedRequestResolverTest {
         """.trimIndent(),
     ).jsonObject
 
+    val didAlgAndKey = randomKey()
+
     private val walletConfig = OpenId4VPConfig(
         supportedClientIdPrefixes = listOf(
             SupportedClientIdPrefix.Preregistered(
@@ -153,9 +158,11 @@ class UnvalidatedRequestResolverTest {
             SupportedClientIdPrefix.RedirectUri,
             SupportedClientIdPrefix.X509SanDns(::validateChain),
             SupportedClientIdPrefix.X509Hash(::validateChain),
+            SupportedClientIdPrefix.DecentralizedIdentifier({ _ -> didAlgAndKey.second.toECPublicKey() }),
         ),
         signedRequestConfiguration = SignedRequestConfiguration(
             supportedAlgorithms = listOf(JWSAlgorithm.RS256),
+            multiSignedRequestsPolicy = MultiSignedRequestsPolicy.Expect(ClientIdPrefix.DecentralizedIdentifier),
         ),
         vpConfiguration = VPConfiguration(
             vpFormatsSupported = VpFormatsSupported(
@@ -875,7 +882,7 @@ class UnvalidatedRequestResolverTest {
         }
 
         @Test
-        fun `client_id is ignored if provided in request`() = runTest {
+        fun `client_id is ignored if provided in unsigned request`() = runTest {
             val requestData = buildJsonObject {
                 put("client_id", "client_id")
                 put("response_mode", "dc_api")
@@ -1031,6 +1038,57 @@ class UnvalidatedRequestResolverTest {
                 requestData,
             )
             resolution.assertIsInvalid<UnexpectedOrigin>()
+        }
+
+        @Test
+        fun `if request is multi-signed, client in resolved request object must match wallet's configuration`() = runTest {
+            val request = UnvalidatedRequestObject(
+                responseMode = "dc_api",
+                nonce = "nonce",
+                dcqlQuery = jsonSupport.decodeFromString<JsonObject>(dcqlQuery),
+                expectedOrigins = listOf("test_origin", "test_origin_alt"),
+            ).multiSigned(
+                listOf(
+                    didSigner(didAlgAndKey),
+                ),
+            )
+            val requestData = buildJsonObject {
+                put("request", Json.encodeToJsonElement(request.jwsJson))
+            }
+
+            val resolution = resolver.resolveRequestObject(
+                OpenId4VPSpec.DC_API_EXCHANGE_PROTOCOL_MULTISIGNED,
+                "test_origin",
+                requestData.jsonObject,
+            )
+
+            val resolvedRequestObject = resolution.assertIsSuccess()
+            assertIs<Client.DecentralizedIdentifier>(resolvedRequestObject.client)
+        }
+
+        @Test
+        fun `if request is multi-signed, if no matching client authentication present, resolution fails`() = runTest {
+            val request = UnvalidatedRequestObject(
+                responseMode = "dc_api",
+                nonce = "nonce",
+                dcqlQuery = jsonSupport.decodeFromString<JsonObject>(dcqlQuery),
+                expectedOrigins = listOf("test_origin", "test_origin_alt"),
+            ).multiSigned(
+                listOf(
+                    verifierAttestationSigner(didAlgAndKey, Clock.systemDefaultZone()),
+                ),
+            )
+            val requestData = buildJsonObject {
+                put("request", Json.encodeToJsonElement(request.jwsJson))
+            }
+
+            val resolution = resolver.resolveRequestObject(
+                OpenId4VPSpec.DC_API_EXCHANGE_PROTOCOL_MULTISIGNED,
+                "test_origin",
+                requestData.jsonObject,
+            )
+
+            resolution.assertIsInvalid<RequestValidationError.NoMatchingClientPrefixInMultiSignedRequest>()
         }
     }
 
