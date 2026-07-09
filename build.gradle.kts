@@ -41,6 +41,7 @@ dependencies {
     api(libs.kotlinx.serialization.json)
     api(libs.ktor.serialization.kotlinx.json)
     implementation(libs.bouncy.castle)
+    api(libs.uri.kmp)
     testImplementation(kotlin("test"))
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.ktor.client.okhttp)
@@ -73,6 +74,7 @@ kotlin {
             "kotlinx.serialization.ExperimentalSerializationApi",
             "kotlin.contracts.ExperimentalContracts",
             "kotlin.io.encoding.ExperimentalEncodingApi",
+            "kotlin.time.ExperimentalTime",
         )
         freeCompilerArgs = listOf(
             "-Xconsistent-data-class-copy-visibility",

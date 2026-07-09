@@ -18,6 +18,7 @@ kotlinx-datetime = "0.7.1-0.6.x-compat"
 cose-java = "1.1.0"
 waltid-mdoc-credentials = "0.11.0"
 kotlinx-serialization = "1.9.0"
+uri-kmp = "0.0.21"
 
 [libraries]
 fasterxml-jackson-module-kotlin = { module = "com.fasterxml.jackson.module:jackson-module-kotlin", version.ref = "fasterxml-jackson" }
@@ -39,6 +40,7 @@ kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.
 cose-java = { module = "com.augustcellars.cose:cose-java", version.ref = "cose-java" }
 waltid-mdoc-credentials = { module = "id.walt.mdoc-credentials:waltid-mdoc-credentials", version.ref = "waltid-mdoc-credentials" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
+uri-kmp = { module = "com.eygraber:uri-kmp", version.ref = "uri-kmp" }
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
