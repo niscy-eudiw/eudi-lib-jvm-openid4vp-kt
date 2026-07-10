@@ -71,27 +71,21 @@ data class WalletRelyingPartyRegistrationCertificateClaims(
         require(serviceDescriptions.isNotEmpty())
 
         require(entitlements.isNotEmpty() && entitlements.distinct().size == entitlements.size)
-        require(entitlements.any { it is Entitlement.WalletRelyingPartyEntitlement })
-
-        if (entitlements.any { it is Entitlement.PaymentServiceProviderEntitlement }) {
-            require(entitlements.any { it is Entitlement.PaymentServiceProviderSubEntitlement })
+        require(entitlements.any { it in Entitlement.WalletRelyingPartyEntitlements })
+        if (entitlements.any { Entitlement.ServiceProvider == it }) {
+            require(entitlements.any { it in Entitlement.ServiceProviderSubEntitlements })
         }
-
-        require(policies.isNotEmpty() && policies.distinct().size == policies.size)
-
-        val attestationProviderEntitlements = setOf(
-            Entitlement.WalletRelyingPartyEntitlement.PIDProvider,
-            Entitlement.WalletRelyingPartyEntitlement.QEAAProvider,
-            Entitlement.WalletRelyingPartyEntitlement.NonQEAAProvider,
-        )
-        if (entitlements.intersect(attestationProviderEntitlements).isNotEmpty()) {
+        if (entitlements.any { it in Entitlement.AttestationProvisioningEntitlements }) {
             require(!providesAttestations.isNullOrEmpty())
         }
 
+        require(policies.isNotEmpty() && policies.distinct().size == policies.size)
+        require(CertificatePolicy.WalletRelyingParty in policies)
+
+        require((null == credentials && null == purpose) || (null != credentials && null != purpose))
         if (null != credentials) {
             require(credentials.isNotEmpty())
         }
-
         if (null != purpose) {
             require(purpose.isNotEmpty())
         }
@@ -141,118 +135,105 @@ object LocaleLanguageTagSerializer : KSerializer<Locale> {
     override fun deserialize(decoder: Decoder): Locale = Locale.Builder().setLanguageTag(decoder.decodeString()).build()
 }
 
-@Serializable(with = EntitlementSerializer::class)
-sealed interface Entitlement {
-    val uri: Uri
-
-    enum class WalletRelyingPartyEntitlement(val oid: String, override val uri: Uri) : Entitlement {
+@Serializable
+@JvmInline
+value class Entitlement(val uri: Uri) {
+    companion object {
         // General service provider
-        ServiceProvider(ETSI119475.SERVICE_PROVIDER_ENTITLEMENT_OID, ETSI119475.SERVICE_PROVIDER_ENTITLEMENT_URI.toKmpUri()),
+        val ServiceProvider = Entitlement(ETSI119475.SERVICE_PROVIDER_ENTITLEMENT_URI.toKmpUri())
 
         // Qualified trust service provider issuing qualified electronic attestations of attributes
-        QEAAProvider(ETSI119475.QEAA_PROVIDER_ENTITLEMENT_OID, ETSI119475.QEAA_PROVIDER_ENTITLEMENT_URI.toKmpUri()),
+        val QEAAProvider = Entitlement(ETSI119475.QEAA_PROVIDER_ENTITLEMENT_URI.toKmpUri())
 
         // Trust service provider issuing non-qualified electronic attestations of attributes
-        NonQEAAProvider(ETSI119475.NON_QEAA_PROVIDER_ENTITLEMENT_OID, ETSI119475.NON_QEAA_PROVIDER_ENTITLEMENT_URI.toKmpUri()),
+        val NonQEAAProvider = Entitlement(ETSI119475.NON_QEAA_PROVIDER_ENTITLEMENT_URI.toKmpUri())
 
         // Public sector body or its agent issuing electronic attestations of attributes from authentic sources
-        PubEAAProvider(ETSI119475.PUB_EAA_PROVIDER_ENTITLEMENT_OID, ETSI119475.PUB_EAA_PROVIDER_ENTITLEMENT_URI.toKmpUri()),
+        val PubEAAProvider = Entitlement(ETSI119475.PUB_EAA_PROVIDER_ENTITLEMENT_URI.toKmpUri())
 
         // Provider of person identification data
-        PIDProvider(ETSI119475.PID_PROVIDER_ENTITLEMENT_OID, ETSI119475.PID_PROVIDER_ENTITLEMENT_URI.toKmpUri()),
+        val PIDProvider = Entitlement(ETSI119475.PID_PROVIDER_ENTITLEMENT_URI.toKmpUri())
 
         // QTSP issuing qualified certificates for electronic seals
-        QCertForESealProvider(
-            ETSI119475.QCERT_FOR_ESEAL_PROVIDER_ENTITLEMENT_OID,
-            ETSI119475.QCERT_FOR_ESEAL_PROVIDER_ENTITLEMENT_URI.toKmpUri(),
-        ),
+        val QCertForESealProvider = Entitlement(ETSI119475.QCERT_FOR_ESEAL_PROVIDER_ENTITLEMENT_URI.toKmpUri())
 
         // QTSP issuing qualified certificates for electronic signatures
-        QCertForESigProvider(
-            ETSI119475.QCERT_FOR_ESIG_PROVIDER_ENTITLEMENT_OID,
-            ETSI119475.QCERT_FOR_ESIG_PROVIDER_ENTITLEMENT_URI.toKmpUri(),
-        ),
+        val QCertForESigProvider = Entitlement(ETSI119475.QCERT_FOR_ESIG_PROVIDER_ENTITLEMENT_URI.toKmpUri())
 
         // QTSP managing remote qualified electronic seal creation devices
-        @Suppress("EnumEntryName")
-        rQSealCDsProvider(ETSI119475.RQSEALCDS_PROVIDER_ENTITLEMENT_OID, ETSI119475.RQSEALCDS_PROVIDER_ENTITLEMENT_URI.toKmpUri()),
+        val rQSealCDsProvider = Entitlement(ETSI119475.RQSEALCDS_PROVIDER_ENTITLEMENT_URI.toKmpUri())
 
         // QTSP managing remote qualified electronic signature creation devices
-        @Suppress("EnumEntryName")
-        rQSigCDsProvider(ETSI119475.RQSIGCDS_PROVIDER_ENTITLEMENT_OID, ETSI119475.RQSIGCDS_PROVIDER_ENTITLEMENT_URI.toKmpUri()),
+        val rQSigCDsProvider = Entitlement(ETSI119475.RQSIGCDS_PROVIDER_ENTITLEMENT_URI.toKmpUri())
 
         // Non-qualified provider for remote signature/seal creation
-        ESigESealCreationProvider(
-            ETSI119475.ESIG_ESEAL_CREATION_PROVIDER_ENTITLEMENT_OID,
-            ETSI119475.ESIG_ESEAL_CREATION_PROVIDER_ENTITLEMENT_URI.toKmpUri(),
-        ),
-    }
+        val ESigESealCreationProvider = Entitlement(ETSI119475.ESIG_ESEAL_CREATION_PROVIDER_ENTITLEMENT_URI.toKmpUri())
 
-    enum class PaymentServiceProviderEntitlement(val role: String, val oid: String, override val uri: Uri) : Entitlement {
-        // Account Servicing
-        AccountingService(ETSI119495.ACCOUNTING_SERVICE_ROLE_NAME, ETSI119495.ACCOUNTING_SERVICE_ROLE_OID),
+        // Entitlements for Wallet Relying Parties
+        val WalletRelyingPartyEntitlements = setOf(
+            ServiceProvider,
+            QEAAProvider,
+            NonQEAAProvider,
+            PubEAAProvider,
+            PIDProvider,
+            QCertForESealProvider,
+            QCertForESigProvider,
+            rQSealCDsProvider,
+            rQSigCDsProvider,
+            ESigESealCreationProvider,
+        )
 
-        // Payment Initiation
-        PaymentInitiation(ETSI119495.PAYMENT_INITIATION_ROLE_NAME, ETSI119495.PAYMENT_INITIATION_ROLE_OID),
+        // Entitlements for Wallet Relying Parties tha Provision Attestations
+        val AttestationProvisioningEntitlements = setOf(
+            PIDProvider,
+            QEAAProvider,
+            NonQEAAProvider,
+            PubEAAProvider,
+        )
 
-        // Account Information
-        AccountingInformation(ETSI119495.ACCOUNT_INFORMATION_ROLE_NAME, ETSI119495.ACCOUNT_INFORMATION_ROLE_OID),
-
-        // Issuing of Card-based payment instruments
-        IssuingOfCardBasedPaymentInstruments(
-            ETSI119495.ISSUING_OF_CARD_BASED_PAYMENT_INSTRUMENTS_ROLE_NAME,
-            ETSI119495.ISSUING_OF_CARD_BASED_PAYMENT_INSTRUMENTS_ROLE_OID,
-        ),
-
-        // Central Bank
-        CentralBank(ETSI119495.CENTRAL_BANK_ROLE_NAME, ETSI119495.CENTRAL_BANK_ROLE_OID),
-
-        // Public Authority
-        PublicAuthority(ETSI119495.PUBLIC_AUTHORITY_ROLE_NAME, ETSI119495.PUBLIC_AUTHORITY_ROLE_OID),
-
-        // Unspecified
-        Unspecified(ETSI119495.UNSPECIFIED_ROLE_NAME, ETSI119495.UNSPECIFIED_ROLE_OID),
-        ;
-
-        constructor(role: String, oid: String) : this(role, oid, "urn:oid:$oid".toKmpUri())
-    }
-
-    enum class PaymentServiceProviderSubEntitlement(override val uri: Uri) : Entitlement {
         // Account Servicing Payment Service Provider
-        AccountServicingPaymentServiceProvider(ETSI119475.ACCOUNT_SERVICING_PAYMENT_SERVICE_PROVIDER_ENTITLEMENT_URI.toKmpUri()),
+        val AccountServicingPaymentServiceProvider =
+            Entitlement(ETSI119475.ACCOUNT_SERVICING_PAYMENT_SERVICE_PROVIDER_ENTITLEMENT_URI.toKmpUri())
 
         // Payment Initiation Service Provider
-        PaymentInitiationServiceProvider(ETSI119475.PAYMENT_INITIATION_SERVICE_PROVIDER_ENTITLEMENT_URI.toKmpUri()),
+        val PaymentInitiationServiceProvider = Entitlement(ETSI119475.PAYMENT_INITIATION_SERVICE_PROVIDER_ENTITLEMENT_URI.toKmpUri())
 
         // Account Information Service Provider
-        AccountInformationServiceProvider(ETSI119475.ACCOUNT_INFORMATION_SERVICE_PROVIDER_ENTITLEMENT_URI.toKmpUri()),
+        val AccountInformationServiceProvider = Entitlement(ETSI119475.ACCOUNT_INFORMATION_SERVICE_PROVIDER_ENTITLEMENT_URI.toKmpUri())
 
         // Payment Service Provider issuing card-based payment instruments
-        PaymentServiceProviderIssuingCardBasedPaymentInstruments(
+        val PaymentServiceProviderIssuingCardBasedPaymentInstruments = Entitlement(
             ETSI119475.PAYMENT_SERVICE_PROVIDER_ISSUING_CARD_BASED_PAYMENT_INSTRUMENTS_ENTITLEMENT_URI.toKmpUri(),
-        ),
+        )
 
         // Unspecified Payment Service Provider
-        UnspecifiedPaymentServiceProvider(ETSI119475.UNSPECIFIED_PAYMENT_SERVICE_PROVIDER_ENTITLEMENT_URI.toKmpUri()),
+        val UnspecifiedPaymentServiceProvider = Entitlement(ETSI119475.UNSPECIFIED_PAYMENT_SERVICE_PROVIDER_ENTITLEMENT_URI.toKmpUri())
+
+        // Sub Entitlements for Service Providers
+        val ServiceProviderSubEntitlements = setOf(
+            AccountServicingPaymentServiceProvider,
+            PaymentInitiationServiceProvider,
+            AccountInformationServiceProvider,
+            PaymentServiceProviderIssuingCardBasedPaymentInstruments,
+            UnspecifiedPaymentServiceProvider,
+        )
     }
 }
 
-object EntitlementSerializer : KSerializer<Entitlement> {
-    override val descriptor: SerialDescriptor
-        get() = PrimitiveSerialDescriptor("Entitlement", PrimitiveKind.STRING)
-
-    override fun serialize(encoder: Encoder, value: Entitlement) {
-        encoder.encodeString(value.uri.toString())
+val Entitlement.oid: String?
+    get() = when (this) {
+        Entitlement.ServiceProvider -> ETSI119475.SERVICE_PROVIDER_ENTITLEMENT_OID
+        Entitlement.QEAAProvider -> ETSI119475.QEAA_PROVIDER_ENTITLEMENT_OID
+        Entitlement.NonQEAAProvider -> ETSI119475.NON_QEAA_PROVIDER_ENTITLEMENT_OID
+        Entitlement.PubEAAProvider -> ETSI119475.PUB_EAA_PROVIDER_ENTITLEMENT_OID
+        Entitlement.PIDProvider -> ETSI119475.PID_PROVIDER_ENTITLEMENT_OID
+        Entitlement.QCertForESealProvider -> ETSI119475.QCERT_FOR_ESEAL_PROVIDER_ENTITLEMENT_OID
+        Entitlement.QCertForESigProvider -> ETSI119475.QCERT_FOR_ESIG_PROVIDER_ENTITLEMENT_OID
+        Entitlement.rQSealCDsProvider -> ETSI119475.RQSEALCDS_PROVIDER_ENTITLEMENT_OID
+        Entitlement.rQSigCDsProvider -> ETSI119475.RQSIGCDS_PROVIDER_ENTITLEMENT_OID
+        Entitlement.ESigESealCreationProvider -> ETSI119475.ESIG_ESEAL_CREATION_PROVIDER_ENTITLEMENT_OID
+        else -> null
     }
-
-    override fun deserialize(decoder: Decoder): Entitlement {
-        val uri = decoder.decodeString().toKmpUri()
-        return Entitlement.WalletRelyingPartyEntitlement.entries.firstOrNull { uri == it.uri }
-            ?: Entitlement.PaymentServiceProviderEntitlement.entries.firstOrNull { uri == it.uri }
-            ?: Entitlement.PaymentServiceProviderSubEntitlement.entries.firstOrNull { uri == it.uri }
-            ?: throw IllegalArgumentException("Unknown Entitlement: $uri")
-    }
-}
 
 @Serializable
 data class SupervisoryAuthority(
@@ -262,10 +243,12 @@ data class SupervisoryAuthority(
 )
 
 @Serializable
-enum class CertificatePolicy(val oid: String) {
-
-    @SerialName(ETSI119475.WALLET_RELYING_PARTY_CERTIFICATE_POLICY_OID)
-    WalletRelyingParty(ETSI119475.WALLET_RELYING_PARTY_CERTIFICATE_POLICY_OID),
+@JvmInline
+value class CertificatePolicy(val oid: String) {
+    companion object {
+        // ETSI Certificate Policy for Wallet Relying Parties
+        val WalletRelyingParty = CertificatePolicy(ETSI119475.WALLET_RELYING_PARTY_CERTIFICATE_POLICY_OID)
+    }
 }
 
 object InstantEpochSecondsSerializer : KSerializer<Instant> {
