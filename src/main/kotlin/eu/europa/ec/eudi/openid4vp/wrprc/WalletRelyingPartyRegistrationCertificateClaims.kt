@@ -49,46 +49,30 @@ data class WalletRelyingPartyRegistrationCertificateClaims(
     @Required @SerialName(ETSI119475.IDENTIFIER_CLAIM) val identifier: String,
     @Required @SerialName(ETSI119475.COUNTRY_CLAIM) val country: CountryCode,
     @Required @SerialName(ETSI119475.REGISTRY_URI_CLAIM) val registry: Url,
-    @Required @SerialName(ETSI119475.SERVICE_DESCRIPTIONS_CLAIM) val serviceDescriptions: List<MultiLangString>,
-    @Required @SerialName(ETSI119475.ENTITLEMENTS_CLAIM) val entitlements: List<Entitlement>,
+    @Required @SerialName(ETSI119475.SERVICE_DESCRIPTION_CLAIM) val serviceDescription: ServiceDescription,
+    @Required @SerialName(ETSI119475.ENTITLEMENTS_CLAIM) val entitlements: Entitlements,
     @Required @SerialName(ETSI119475.PRIVACY_POLICY_CLAIM) val privacyPolicy: Url,
     @Required @SerialName(ETSI119475.INFO_URI_CLAIM) val info: Url,
     @Required @SerialName(ETSI119475.SUPPORT_URI_CLAIM) val support: Url,
     @Required @SerialName(ETSI119475.SUPERVISORY_AUTHORITY_CLAIM) val supervisoryAuthority: SupervisoryAuthority,
-    @Required @SerialName(ETSI119475.POLICY_ID_CLAIM) val policies: List<CertificatePolicy>,
+    @Required @SerialName(ETSI119475.POLICY_ID_CLAIM) val policies: CertificatePolicies,
     @Required @SerialName(ETSI119475.CERTIFICATE_POLICY_CLAIM) val certificatePolicy: Url,
-    @Required @SerialName(RFC7519.ISSUED_AT_CLAIM) @Serializable(with = InstantEpochSecondsSerializer::class) val issuedAt: Instant,
+    @Required @SerialName(RFC7519.ISSUED_AT_CLAIM) val issuedAt: EpochSecondsInstant,
     @Required @SerialName(TokenStatusList.STATUS_CLAIM) val status: Status,
     @SerialName(ETSI119475.PROVIDES_ATTESTATIONS_CLAIM) val providesAttestations: List<Credential>? = null,
-    @SerialName(ETSI119475.CREDENTIALS_CLAIM) val credentials: List<Credential>? = null,
-    @SerialName(ETSI119475.PURPOSE_CLAIM) val purpose: List<MultiLangString>? = null,
+    @SerialName(ETSI119475.CREDENTIALS_CLAIM) val credentials: Credentials? = null,
+    @SerialName(ETSI119475.PURPOSE_CLAIM) val purpose: Purpose? = null,
     @SerialName(ETSI119475.INTENDED_USE_ID_CLAIM) val intendedUse: String? = null,
     @SerialName(ETSI119475.PUBLIC_BODY_CLAIM) val publicSectorBody: Boolean? = null,
-    @SerialName(RFC7519.EXPIRES_AT_CLAIM) @Serializable(with = InstantEpochSecondsSerializer::class) val expiresAt: Instant? = null,
+    @SerialName(RFC7519.EXPIRES_AT_CLAIM) val expiresAt: EpochSecondsInstant? = null,
     @SerialName(ETSI119475.INTERMEDIARY_CLAIM) val intermediaries: Intermediary? = null,
 ) {
     init {
-        require(serviceDescriptions.isNotEmpty())
-
-        require(entitlements.isNotEmpty() && entitlements.distinct().size == entitlements.size)
-        require(entitlements.any { it in Entitlement.WalletRelyingPartyEntitlements })
-        if (entitlements.any { Entitlement.ServiceProvider == it }) {
-            require(entitlements.any { it in Entitlement.ServiceProviderSubEntitlements })
-        }
         if (entitlements.any { it in Entitlement.AttestationProvisioningEntitlements }) {
             require(!providesAttestations.isNullOrEmpty())
         }
 
-        require(policies.isNotEmpty() && policies.distinct().size == policies.size)
-        require(CertificatePolicy.WalletRelyingParty in policies)
-
         require((null == credentials && null == purpose) || (null != credentials && null != purpose))
-        if (null != credentials) {
-            require(credentials.isNotEmpty())
-        }
-        if (null != purpose) {
-            require(purpose.isNotEmpty())
-        }
     }
 }
 
@@ -97,6 +81,14 @@ data class WalletRelyingPartyRegistrationCertificateClaims(
 value class CountryCode(val code: String) {
     init {
         require(code.matches("[A-Z]{2}".toRegex()))
+    }
+}
+
+@Serializable
+@JvmInline
+value class ServiceDescription(val descriptions: List<MultiLangString>) : Iterable<MultiLangString> by descriptions {
+    init {
+        require(descriptions.isNotEmpty())
     }
 }
 
@@ -236,6 +228,19 @@ val Entitlement.oid: String?
     }
 
 @Serializable
+@JvmInline
+value class Entitlements(val entitlements: List<Entitlement>) : Iterable<Entitlement> by entitlements {
+    init {
+        require(entitlements.isNotEmpty())
+        require(entitlements.distinct().size == entitlements.size)
+        require(entitlements.intersect(Entitlement.WalletRelyingPartyEntitlements).isNotEmpty())
+        if (Entitlement.ServiceProvider in entitlements) {
+            require(entitlements.intersect(Entitlement.ServiceProviderSubEntitlements).isNotEmpty())
+        }
+    }
+}
+
+@Serializable
 data class SupervisoryAuthority(
     @Required @SerialName(ETSI119475.SUPERVISOR_AUTHORITY_EMAIL_CLAIM) val email: String,
     @Required @SerialName(ETSI119475.SUPERVISOR_AUTHORITY_PHONE_CLAIM) val phone: String,
@@ -250,6 +255,20 @@ value class CertificatePolicy(val oid: String) {
         val WalletRelyingParty = CertificatePolicy(ETSI119475.WALLET_RELYING_PARTY_CERTIFICATE_POLICY_OID)
     }
 }
+
+@Serializable
+@JvmInline
+value class CertificatePolicies(val policies: List<CertificatePolicy>) : Iterable<CertificatePolicy> by policies {
+    init {
+        require(policies.isNotEmpty())
+        require(policies.distinct().size == policies.size)
+        require(CertificatePolicy.WalletRelyingParty in policies)
+    }
+}
+
+typealias EpochSecondsInstant =
+    @Serializable(with = InstantEpochSecondsSerializer::class)
+    Instant
 
 object InstantEpochSecondsSerializer : KSerializer<Instant> {
     override val descriptor: SerialDescriptor
@@ -302,6 +321,22 @@ data class Claim(
         if (null != values) {
             require(values.isNotEmpty() && values.none { JsonNull == it })
         }
+    }
+}
+
+@Serializable
+@JvmInline
+value class Credentials(val credentials: List<Credential>) : Iterable<Credential> by credentials {
+    init {
+        require(credentials.isNotEmpty())
+    }
+}
+
+@Serializable
+@JvmInline
+value class Purpose(val purpose: List<MultiLangString>) : Iterable<MultiLangString> by purpose {
+    init {
+        require(purpose.isNotEmpty())
     }
 }
 

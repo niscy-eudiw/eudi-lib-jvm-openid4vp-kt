@@ -58,7 +58,7 @@ object ETSI119475 {
     const val IDENTIFIER_CLAIM = "sub"
     const val COUNTRY_CLAIM = "country"
     const val REGISTRY_URI_CLAIM = "registry_uri"
-    const val SERVICE_DESCRIPTIONS_CLAIM = "srv_description"
+    const val SERVICE_DESCRIPTION_CLAIM = "srv_description"
     const val ENTITLEMENTS_CLAIM = "entitlements"
     const val PRIVACY_POLICY_CLAIM = "privacy_policy"
     const val INFO_URI_CLAIM = "info_uri"
