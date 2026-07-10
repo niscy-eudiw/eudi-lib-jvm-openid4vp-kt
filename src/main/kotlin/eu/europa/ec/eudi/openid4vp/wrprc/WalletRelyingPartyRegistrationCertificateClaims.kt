@@ -59,7 +59,7 @@ data class WalletRelyingPartyRegistrationCertificateClaims(
     @Required @SerialName(ETSI119475.CERTIFICATE_POLICY_CLAIM) val certificatePolicy: Url,
     @Required @SerialName(RFC7519.ISSUED_AT_CLAIM) val issuedAt: EpochSecondsInstant,
     @Required @SerialName(TokenStatusList.STATUS_CLAIM) val status: Status,
-    @SerialName(ETSI119475.PROVIDES_ATTESTATIONS_CLAIM) val providesAttestations: List<Credential>? = null,
+    @SerialName(ETSI119475.PROVIDES_ATTESTATIONS_CLAIM) val providesAttestations: ProvidedAttestations? = null,
     @SerialName(ETSI119475.CREDENTIALS_CLAIM) val credentials: Credentials? = null,
     @SerialName(ETSI119475.PURPOSE_CLAIM) val purpose: Purpose? = null,
     @SerialName(ETSI119475.INTENDED_USE_ID_CLAIM) val intendedUse: String? = null,
@@ -68,13 +68,32 @@ data class WalletRelyingPartyRegistrationCertificateClaims(
     @SerialName(ETSI119475.INTERMEDIARY_CLAIM) val intermediaries: Intermediary? = null,
 ) {
     init {
-        if (entitlements.any { it in Entitlement.AttestationProvisioningEntitlements }) {
-            require(!providesAttestations.isNullOrEmpty())
+        require(
+            (null != legalName && null == givenName && null == familyName) ||
+                (null == legalName && null != givenName && null != familyName),
+        )
+
+        if (entitlements.intersect(Entitlement.AttestationProvisioningEntitlements).isNotEmpty()) {
+            require(null != providesAttestations)
+        } else {
+            require(null == providesAttestations)
         }
 
         require((null == credentials && null == purpose) || (null != credentials && null != purpose))
+        if (null != intendedUse) {
+            require(null != credentials && null != purpose)
+        }
     }
 }
+
+val WalletRelyingPartyRegistrationCertificateClaims.legalPerson: Boolean
+    get() = null != legalName
+
+val WalletRelyingPartyRegistrationCertificateClaims.naturalPerson: Boolean
+    get() = null != givenName && null != familyName
+
+val WalletRelyingPartyRegistrationCertificateClaims.attestationProvider: Boolean
+    get() = null != providesAttestations
 
 @Serializable
 @JvmInline
@@ -125,6 +144,18 @@ object LocaleLanguageTagSerializer : KSerializer<Locale> {
     }
 
     override fun deserialize(decoder: Decoder): Locale = Locale.Builder().setLanguageTag(decoder.decodeString()).build()
+}
+
+@Serializable
+@JvmInline
+value class Entitlements(val entitlements: List<Entitlement>) : Iterable<Entitlement> by entitlements {
+    init {
+        require(entitlements.isNotEmpty())
+        require(entitlements.intersect(Entitlement.WalletRelyingPartyEntitlements).isNotEmpty())
+        if (Entitlement.ServiceProvider in entitlements) {
+            require(entitlements.intersect(Entitlement.ServiceProviderSubEntitlements).isNotEmpty())
+        }
+    }
 }
 
 @Serializable
@@ -228,19 +259,6 @@ val Entitlement.oid: String?
     }
 
 @Serializable
-@JvmInline
-value class Entitlements(val entitlements: List<Entitlement>) : Iterable<Entitlement> by entitlements {
-    init {
-        require(entitlements.isNotEmpty())
-        require(entitlements.distinct().size == entitlements.size)
-        require(entitlements.intersect(Entitlement.WalletRelyingPartyEntitlements).isNotEmpty())
-        if (Entitlement.ServiceProvider in entitlements) {
-            require(entitlements.intersect(Entitlement.ServiceProviderSubEntitlements).isNotEmpty())
-        }
-    }
-}
-
-@Serializable
 data class SupervisoryAuthority(
     @Required @SerialName(ETSI119475.SUPERVISOR_AUTHORITY_EMAIL_CLAIM) val email: String,
     @Required @SerialName(ETSI119475.SUPERVISOR_AUTHORITY_PHONE_CLAIM) val phone: String,
@@ -261,7 +279,6 @@ value class CertificatePolicy(val oid: String) {
 value class CertificatePolicies(val policies: List<CertificatePolicy>) : Iterable<CertificatePolicy> by policies {
     init {
         require(policies.isNotEmpty())
-        require(policies.distinct().size == policies.size)
         require(CertificatePolicy.WalletRelyingParty in policies)
     }
 }
@@ -294,33 +311,10 @@ data class Status(
 }
 
 @Serializable
-data class Credential(
-    @Required @SerialName(ETSI119475.CREDENTIAL_FORMAT_CLAIM) val format: Format,
-    @Required @SerialName(ETSI119475.CREDENTIAL_META_CLAIM) val meta: JsonObject,
-    @SerialName(ETSI119475.CREDENTIAL_CLAIM_CLAIM) val claim: List<Claim>? = null,
-) {
+@JvmInline
+value class ProvidedAttestations(val attestations: List<Credential>) : Iterable<Credential> by attestations {
     init {
-        if (null != claim) {
-            require(claim.isNotEmpty())
-        }
-    }
-}
-
-val Credential.msoMDocMeta: DCQLMetaMsoMdocExtensions
-    get() = jsonSupport.decodeFromJsonElement<DCQLMetaMsoMdocExtensions>(meta)
-
-val Credential.sdJwtVcMeta: DCQLMetaSdJwtVcExtensions
-    get() = jsonSupport.decodeFromJsonElement<DCQLMetaSdJwtVcExtensions>(meta)
-
-@Serializable
-data class Claim(
-    @Required @SerialName(ETSI119475.CLAIM_PATH_CLAIM) val path: ClaimPath,
-    @SerialName(ETSI119475.CLAIM_VALUES_CLAIM) val values: List<JsonPrimitive>? = null,
-) {
-    init {
-        if (null != values) {
-            require(values.isNotEmpty() && values.none { JsonNull == it })
-        }
+        require(attestations.isNotEmpty())
     }
 }
 
@@ -329,6 +323,41 @@ data class Claim(
 value class Credentials(val credentials: List<Credential>) : Iterable<Credential> by credentials {
     init {
         require(credentials.isNotEmpty())
+    }
+}
+
+@Serializable
+data class Credential(
+    @Required @SerialName(ETSI119475.CREDENTIAL_FORMAT_CLAIM) val format: Format,
+    @Required @SerialName(ETSI119475.CREDENTIAL_META_CLAIM) val meta: JsonObject,
+    @SerialName(ETSI119475.CREDENTIAL_CLAIM_CLAIM) val claim: Claims? = null,
+)
+
+val Credential.msoMDocMeta: DCQLMetaMsoMdocExtensions
+    get() = jsonSupport.decodeFromJsonElement<DCQLMetaMsoMdocExtensions>(meta)
+
+val Credential.sdJwtVcMeta: DCQLMetaSdJwtVcExtensions
+    get() = jsonSupport.decodeFromJsonElement<DCQLMetaSdJwtVcExtensions>(meta)
+
+@Serializable
+@JvmInline
+value class Claims(val claims: List<Claim>) : Iterable<Claim> by claims {
+    init {
+        require(claims.isNotEmpty())
+    }
+}
+
+@Serializable
+data class Claim(
+    @Required @SerialName(ETSI119475.CLAIM_PATH_CLAIM) val path: ClaimPath,
+    @SerialName(ETSI119475.CLAIM_VALUES_CLAIM) val values: Values? = null,
+)
+
+@Serializable
+@JvmInline
+value class Values(val values: List<JsonPrimitive>) : Iterable<JsonPrimitive> by values {
+    init {
+        require(values.isNotEmpty() && values.none { JsonNull == it })
     }
 }
 
