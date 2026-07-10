@@ -13,21 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+@file:UseSerializers(NonEmptyListSerializer::class)
+
 package eu.europa.ec.eudi.openid4vp.wrprc
 
 import com.eygraber.uri.Uri
 import com.eygraber.uri.Url
 import com.eygraber.uri.toKmpUri
 import eu.europa.ec.eudi.openid4vp.Format
+import eu.europa.ec.eudi.openid4vp.NonEmptyList
 import eu.europa.ec.eudi.openid4vp.dcql.ClaimPath
 import eu.europa.ec.eudi.openid4vp.dcql.DCQLMetaMsoMdocExtensions
 import eu.europa.ec.eudi.openid4vp.dcql.DCQLMetaSdJwtVcExtensions
+import eu.europa.ec.eudi.openid4vp.internal.NonEmptyListSerializer
 import eu.europa.ec.eudi.openid4vp.internal.jsonSupport
 import eu.europa.ec.eudi.openid4vp.runCatchingCancellable
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Required
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.UseSerializers
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
@@ -103,13 +108,7 @@ value class CountryCode(val code: String) {
     }
 }
 
-@Serializable
-@JvmInline
-value class ServiceDescription(val descriptions: List<MultiLangString>) : Iterable<MultiLangString> by descriptions {
-    init {
-        require(descriptions.isNotEmpty())
-    }
-}
+typealias ServiceDescription = NonEmptyList<MultiLangString>
 
 @Serializable
 data class MultiLangString(
@@ -148,9 +147,8 @@ object LocaleLanguageTagSerializer : KSerializer<Locale> {
 
 @Serializable
 @JvmInline
-value class Entitlements(val entitlements: List<Entitlement>) : Iterable<Entitlement> by entitlements {
+value class Entitlements(val entitlements: NonEmptyList<Entitlement>) : Iterable<Entitlement> by entitlements {
     init {
-        require(entitlements.isNotEmpty())
         require(entitlements.intersect(Entitlement.WalletRelyingPartyEntitlements).isNotEmpty())
         if (Entitlement.ServiceProvider in entitlements) {
             require(entitlements.intersect(Entitlement.ServiceProviderSubEntitlements).isNotEmpty())
@@ -267,9 +265,8 @@ data class SupervisoryAuthority(
 
 @Serializable
 @JvmInline
-value class CertificatePolicies(val policies: List<CertificatePolicy>) : Iterable<CertificatePolicy> by policies {
+value class CertificatePolicies(val policies: NonEmptyList<CertificatePolicy>) : Iterable<CertificatePolicy> by policies {
     init {
-        require(policies.isNotEmpty())
         require(CertificatePolicy.WalletRelyingParty in policies)
     }
 }
@@ -310,13 +307,7 @@ data class Status(
     )
 }
 
-@Serializable
-@JvmInline
-value class ProvidedAttestations(val attestations: List<Credential>) : Iterable<Credential> by attestations {
-    init {
-        require(attestations.isNotEmpty())
-    }
-}
+typealias ProvidedAttestations = NonEmptyList<Credential>
 
 @Serializable
 data class Credential(
@@ -331,13 +322,7 @@ val Credential.msoMDocMeta: DCQLMetaMsoMdocExtensions
 val Credential.sdJwtVcMeta: DCQLMetaSdJwtVcExtensions
     get() = jsonSupport.decodeFromJsonElement<DCQLMetaSdJwtVcExtensions>(meta)
 
-@Serializable
-@JvmInline
-value class Claims(val claims: List<Claim>) : Iterable<Claim> by claims {
-    init {
-        require(claims.isNotEmpty())
-    }
-}
+typealias Claims = NonEmptyList<Claim>
 
 @Serializable
 data class Claim(
@@ -347,27 +332,15 @@ data class Claim(
 
 @Serializable
 @JvmInline
-value class Values(val values: List<JsonPrimitive>) : Iterable<JsonPrimitive> by values {
+value class Values(val values: NonEmptyList<JsonPrimitive>) : Iterable<JsonPrimitive> by values {
     init {
-        require(values.isNotEmpty() && values.none { JsonNull == it })
+        require(values.none { JsonNull == it })
     }
 }
 
-@Serializable
-@JvmInline
-value class Credentials(val credentials: List<Credential>) : Iterable<Credential> by credentials {
-    init {
-        require(credentials.isNotEmpty())
-    }
-}
+typealias Credentials = NonEmptyList<Credential>
 
-@Serializable
-@JvmInline
-value class Purpose(val purpose: List<MultiLangString>) : Iterable<MultiLangString> by purpose {
-    init {
-        require(purpose.isNotEmpty())
-    }
-}
+typealias Purpose = NonEmptyList<MultiLangString>
 
 @Serializable
 data class Intermediary(

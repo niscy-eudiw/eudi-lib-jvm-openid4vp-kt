@@ -20,16 +20,12 @@ import com.nimbusds.jose.crypto.factories.DefaultJWSVerifierFactory
 import com.nimbusds.jose.util.JSONObjectUtils
 import com.nimbusds.jose.util.X509CertUtils
 import com.nimbusds.jwt.SignedJWT
+import eu.europa.ec.eudi.openid4vp.NonEmptyList
 import eu.europa.ec.eudi.openid4vp.internal.jsonSupport
 import eu.europa.ec.eudi.openid4vp.runCatchingCancellable
 import java.security.cert.X509Certificate
 
-@JvmInline
-value class CertificateChain(val chain: List<X509Certificate>) {
-    init {
-        require(chain.isNotEmpty())
-    }
-}
+typealias CertificateChain = NonEmptyList<X509Certificate>
 
 data class WalletRelyingPartyRegistrationCertificate private constructor(
     val certificate: SignedJWT,
@@ -37,7 +33,7 @@ data class WalletRelyingPartyRegistrationCertificate private constructor(
     val claims: WalletRelyingPartyRegistrationCertificateClaims,
 ) {
     val signingCertificate: X509Certificate
-        get() = certificateChain.chain.first()
+        get() = certificateChain.first()
 
     companion object {
         fun parseOrNull(value: String): WalletRelyingPartyRegistrationCertificate? = tryParse(value).getOrNull()

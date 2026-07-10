@@ -387,3 +387,10 @@ internal fun VpFormatsSupported.filter(formats: Collection<Format>): VpFormatsSu
         sdJwtVc = sdJwtVc?.takeIf { Format.SdJwtVc in formats },
         msoMdoc = msoMdoc?.takeIf { Format.MsoMdoc in formats },
     )
+
+@JvmInline
+value class NonEmptyList<Element>(val values: List<Element>) : Iterable<Element> by values {
+    init {
+        require(values.isNotEmpty())
+    }
+}
