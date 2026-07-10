@@ -73,7 +73,7 @@ data class WalletRelyingPartyRegistrationCertificateClaims(
                 (null == legalName && null != givenName && null != familyName),
         )
 
-        if (entitlements.intersect(Entitlement.AttestationProvisioningEntitlements).isNotEmpty()) {
+        if (entitlements.intersect(Entitlement.AttestationProviderEntitlements).isNotEmpty()) {
             require(null != providesAttestations)
         } else {
             require(null == providesAttestations)
@@ -206,8 +206,8 @@ value class Entitlement(val uri: Uri) {
             ESigESealCreationProvider,
         )
 
-        // Entitlements for Wallet Relying Parties tha Provision Attestations
-        val AttestationProvisioningEntitlements = setOf(
+        // Entitlements for Wallet Relying Parties that issue Attestations
+        val AttestationProviderEntitlements = setOf(
             PIDProvider,
             QEAAProvider,
             NonQEAAProvider,
