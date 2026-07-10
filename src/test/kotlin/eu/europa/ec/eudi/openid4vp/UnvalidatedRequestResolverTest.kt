@@ -140,21 +140,12 @@ class UnvalidatedRequestResolverTest {
 
     private val walletConfig = OpenId4VPConfig(
         supportedClientIdPrefixes = listOf(
-            SupportedClientIdPrefix.Preregistered(
-                PreregisteredClient(
-                    clientId = "Verifier",
-                    legalName = "Verifier",
-                    jarConfig = JWSAlgorithm.RS256 to JWKSet(signingKey).toPublicJWKSet(),
-                ),
-            ),
-            SupportedClientIdPrefix.RedirectUri,
             SupportedClientIdPrefix.X509SanDns(::validateChain),
             SupportedClientIdPrefix.X509Hash(::validateChain),
-            SupportedClientIdPrefix.DecentralizedIdentifier({ _ -> didAlgAndKey.second.toECPublicKey() }),
         ),
         signedRequestConfiguration = SignedRequestConfiguration(
             supportedAlgorithms = listOf(JWSAlgorithm.RS256),
-            multiSignedRequestsPolicy = MultiSignedRequestsPolicy.Expect(ClientIdPrefix.DecentralizedIdentifier),
+            multiSignedRequestsPolicy = MultiSignedRequestsPolicy.Expect(ClientIdPrefix.X509Hash),
         ),
         vpConfiguration = VPConfiguration(
             vpFormatsSupported = VpFormatsSupported(
@@ -1022,6 +1013,8 @@ class UnvalidatedRequestResolverTest {
 
         @Test
         fun `if request is multi-signed, client in resolved request object must match wallet's configuration`() = runTest {
+            val wrp = WRP.Random
+
             val request = UnvalidatedRequestObject(
                 responseMode = "dc_api",
                 responseType = "vp_token",
@@ -1029,9 +1022,7 @@ class UnvalidatedRequestResolverTest {
                 dcqlQuery = jsonSupport.decodeFromString<JsonObject>(dcqlQuery),
                 expectedOrigins = listOf("test_origin", "test_origin_alt"),
             ).multiSigned(
-                listOf(
-                    didSigner(didAlgAndKey),
-                ),
+                listOf(wrp.schemeSigner()),
             )
             val requestData = buildJsonObject {
                 put("request", Json.encodeToJsonElement(request.jwsJson))
@@ -1044,7 +1035,7 @@ class UnvalidatedRequestResolverTest {
             )
 
             val resolvedRequestObject = resolution.assertIsSuccess()
-            assertIs<Client.DecentralizedIdentifier>(resolvedRequestObject.client)
+            assertIs<Client.X509Hash>(resolvedRequestObject.client)
         }
 
         @Test
@@ -1057,7 +1048,7 @@ class UnvalidatedRequestResolverTest {
                 expectedOrigins = listOf("test_origin", "test_origin_alt"),
             ).multiSigned(
                 listOf(
-                    verifierAttestationSigner(didAlgAndKey, Clock.systemDefaultZone()),
+                    WRP.Random.schemeSigner(),
                 ),
             )
             val requestData = buildJsonObject {
@@ -1075,6 +1066,7 @@ class UnvalidatedRequestResolverTest {
 
         @Test
         fun `if request is multi-signed, if no matching expected origin present, resolution fails`() = runTest {
+            val wrp = WRP.Random
             val request = UnvalidatedRequestObject(
                 responseMode = "dc_api",
                 responseType = "vp_token",
@@ -1082,9 +1074,7 @@ class UnvalidatedRequestResolverTest {
                 dcqlQuery = jsonSupport.decodeFromString<JsonObject>(dcqlQuery),
                 expectedOrigins = listOf("test_origin", "test_origin_alt"),
             ).multiSigned(
-                listOf(
-                    didSigner(didAlgAndKey),
-                ),
+                listOf(wrp.schemeSigner()),
             )
             val requestData = buildJsonObject {
                 put("request", Json.encodeToJsonElement(request.jwsJson))

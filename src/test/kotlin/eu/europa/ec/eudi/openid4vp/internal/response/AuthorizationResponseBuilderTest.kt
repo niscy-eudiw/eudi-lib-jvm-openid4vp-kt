@@ -100,62 +100,63 @@ class AuthorizationResponseBuilderTest {
     }
 
     @Test
-    fun `when direct_post jwt, builder should return DirectPostJwt with response encryption parameters of correct type`() = runTest {
-        fun test(state: String? = null) {
-            val responseMode = ResponseMode.DirectPostJwt("https://respond.here".asHttpsURL().getOrThrow())
-            val query = DCQL(
-                credentials = Credentials(
-                    CredentialQuery.sdJwtVc(
-                        id = QueryId("query_for_identity"),
-                        DCQLMetaSdJwtVcExtensions(
-                            vctValues = listOf("identity_credential"),
+    fun `when direct_post jwt, builder should return DirectPostJwt with response encryption parameters of correct type`() =
+        runTest {
+            fun test(state: String? = null) {
+                val responseMode = ResponseMode.DirectPostJwt("https://respond.here".asHttpsURL().getOrThrow())
+                val query = DCQL(
+                    credentials = Credentials(
+                        CredentialQuery.sdJwtVc(
+                            id = QueryId("query_for_identity"),
+                            DCQLMetaSdJwtVcExtensions(
+                                vctValues = listOf("identity_credential"),
+                            ),
                         ),
                     ),
-                ),
-            )
-            val verifierMetaData = assertDoesNotThrow {
-                ClientMetaDataValidator.validateClientMetaData(
-                    Verifier.metaDataRequestingEncryptedResponse,
-                    responseMode,
-                    query,
-                    Wallet.config.responseEncryptionConfiguration,
-                    Wallet.config.vpConfiguration.vpFormatsSupported,
                 )
+                val verifierMetaData = assertDoesNotThrow {
+                    ClientMetaDataValidator.validateClientMetaData(
+                        Verifier.metaDataRequestingEncryptedResponse,
+                        responseMode,
+                        query,
+                        Wallet.config.responseEncryptionConfiguration,
+                        Wallet.config.vpConfiguration.vpFormatsSupported,
+                    )
+                }
+                val resolvedRequest =
+                    ResolvedRequestObject(
+                        query = query,
+                        responseEncryptionSpecification = verifierMetaData.responseEncryptionSpecification,
+                        vpFormatsSupported = VpFormatsSupported(
+                            msoMdoc = VpFormatsSupported.MsoMdoc(
+                                issuerAuthAlgorithms = listOf(CoseAlgorithm(-7)),
+                                deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
+                            ),
+                        ),
+                        client = WRP.Random.client,
+                        nonce = "0S6_WzA2Mj",
+                        responseMode = responseMode,
+                        state = state,
+                        transactionData = null,
+                        verifierInfo = null,
+                    )
+
+                val vpTokenConsensus = Consensus.PositiveConsensus(
+                    VerifiablePresentations(
+                        mapOf(
+                            QueryId("pdId") to listOf(VerifiablePresentation.Generic("dummy_vp_token")),
+                        ),
+                    ),
+                )
+                val response = resolvedRequest.responseWith(vpTokenConsensus, null)
+
+                assertTrue("Response not of the expected type DirectPostJwt") { response is AuthorizationResponse.DirectPostJwt }
+                assertIs<AuthorizationResponse.DirectPostJwt>(response)
+                val responseEncryptionSpecification = response.responseEncryptionSpecification
+                assertNotNull(responseEncryptionSpecification)
             }
-            val resolvedRequest =
-                ResolvedRequestObject(
-                    query = query,
-                    responseEncryptionSpecification = verifierMetaData.responseEncryptionSpecification,
-                    vpFormatsSupported = VpFormatsSupported(
-                        msoMdoc = VpFormatsSupported.MsoMdoc(
-                            issuerAuthAlgorithms = listOf(CoseAlgorithm(-7)),
-                            deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
-                        ),
-                    ),
-                    client = Client.Preregistered("https%3A%2F%2Fclient.example.org%2Fcb", "Verifier"),
-                    nonce = "0S6_WzA2Mj",
-                    responseMode = responseMode,
-                    state = state,
-                    transactionData = null,
-                    verifierInfo = null,
-                )
 
-            val vpTokenConsensus = Consensus.PositiveConsensus(
-                VerifiablePresentations(
-                    mapOf(
-                        QueryId("pdId") to listOf(VerifiablePresentation.Generic("dummy_vp_token")),
-                    ),
-                ),
-            )
-            val response = resolvedRequest.responseWith(vpTokenConsensus, null)
-
-            assertTrue("Response not of the expected type DirectPostJwt") { response is AuthorizationResponse.DirectPostJwt }
-            assertIs<AuthorizationResponse.DirectPostJwt>(response)
-            val responseEncryptionSpecification = response.responseEncryptionSpecification
-            assertNotNull(responseEncryptionSpecification)
+            test(genState())
+            test()
         }
-
-        test(genState())
-        test()
-    }
 }

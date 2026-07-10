@@ -19,20 +19,16 @@ import com.nimbusds.jose.JOSEObjectType
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSHeader
 import com.nimbusds.jose.crypto.factories.DefaultJWSSignerFactory
-import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import eu.europa.ec.eudi.openid4vp.internal.Base64UrlNoPadding
-import eu.europa.ec.eudi.openid4vp.internal.DID
 import eu.europa.ec.eudi.openid4vp.internal.JwsJson
 import eu.europa.ec.eudi.openid4vp.internal.Signature
 import eu.europa.ec.eudi.openid4vp.internal.base64UrlNoPadding
-import eu.europa.ec.eudi.openid4vp.internal.request.AttestationIssuer
 import eu.europa.ec.eudi.openid4vp.internal.request.ReceivedRequest
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedRequestObject
 import kotlinx.serialization.json.Json
-import java.time.Clock
 
 internal fun UnvalidatedRequestObject.multiSigned(
     signers: List<SchemeSigner>,
@@ -83,29 +79,6 @@ class SchemeSigner(
     val key: JWK,
     val headerCustomization: (JWSHeader.Builder).() -> Unit,
 )
-
-internal fun didSigner(didAlgAndKey: Pair<JWSAlgorithm, ECKey>): SchemeSigner {
-    val (alg2, key2) = didAlgAndKey
-    val originalClientId = DID.parse("did:example:123").getOrThrow()
-    val clientId = "decentralized_identifier:$originalClientId"
-    return SchemeSigner(alg2, key2) {
-        customParam("client_id", clientId)
-        keyID("did:example:123#key-1")
-    }
-}
-
-internal fun verifierAttestationSigner(didAlgAndKey: Pair<JWSAlgorithm, ECKey>, clock: Clock): SchemeSigner {
-    val (alg, key) = didAlgAndKey
-    val verifierAttestation = AttestationIssuer.attestation(
-        clock = clock,
-        clientId = "verifier_attestation:http://example.com",
-        clientPubKey = key.toPublicJWK(),
-    )
-    return SchemeSigner(alg, key) {
-        customParam("client_id", "verifier_attestation:http://www.example.com")
-        customParam("jwt", verifierAttestation.serialize())
-    }
-}
 
 internal fun UnvalidatedRequestObject.toJWTClaimSet(): JWTClaimsSet {
     val json = Json.encodeToString(this)

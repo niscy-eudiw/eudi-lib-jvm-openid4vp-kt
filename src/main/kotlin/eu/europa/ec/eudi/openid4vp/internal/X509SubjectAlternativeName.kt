@@ -18,8 +18,6 @@ package eu.europa.ec.eudi.openid4vp.internal
 import eu.europa.ec.eudi.openid4vp.runCatchingCancellable
 import java.security.cert.X509Certificate
 
-fun X509Certificate.sanOfUniformResourceIdentifier(): Result<List<String>> =
-    san(X509SubjectAlternativeNameType.UniformResourceIdentifier)
 fun X509Certificate.sanOfDNSName(): Result<List<String>> =
     san(X509SubjectAlternativeNameType.DNSName)
 

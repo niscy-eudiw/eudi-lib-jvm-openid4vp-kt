@@ -46,7 +46,6 @@ internal class RequestFetcher(
      * Fetches the authorization request, if needed
      */
     suspend fun fetchRequest(request: UnvalidatedRequest): ReceivedRequest = when (request) {
-        is UnvalidatedRequest.Plain -> ReceivedRequest.Unsigned(request.requestObject)
         is UnvalidatedRequest.JwtSecured -> {
             val (jwt, walletNonce) = when (request) {
                 is UnvalidatedRequest.JwtSecured.PassByValue -> request.jwt to null

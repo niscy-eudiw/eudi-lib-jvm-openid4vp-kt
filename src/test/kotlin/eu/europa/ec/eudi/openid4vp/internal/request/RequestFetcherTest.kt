@@ -204,7 +204,7 @@ private fun config(clientId: String, jarEncryptionRequirement: EncryptionRequire
                 ),
             ),
         ),
-        supportedClientIdPrefixes = listOf(SupportedClientIdPrefix.Preregistered(PreregisteredClient(clientId, clientId))),
+        supportedClientIdPrefixes = listOf(SupportedClientIdPrefix.X509Hash({ true })),
     )
 
 private fun createSignedRequestObject(clientId: String, walletNonce: String): SignedJWT =

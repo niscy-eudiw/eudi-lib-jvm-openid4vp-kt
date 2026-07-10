@@ -23,13 +23,10 @@ import com.nimbusds.jose.util.Base64URL
 import com.nimbusds.jwt.EncryptedJWT
 import com.nimbusds.oauth2.sdk.id.State
 import eu.europa.ec.eudi.openid4vp.*
-import eu.europa.ec.eudi.openid4vp.RequestValidationError.MissingResponseType
-import eu.europa.ec.eudi.openid4vp.RequestValidationError.MissingScope
 import eu.europa.ec.eudi.openid4vp.dcql.DCQL
 import eu.europa.ec.eudi.openid4vp.dcql.QueryId
 import eu.europa.ec.eudi.openid4vp.internal.request.ClientMetaDataValidator
 import eu.europa.ec.eudi.openid4vp.internal.request.UnvalidatedClientMetaData
-import eu.europa.ec.eudi.openid4vp.internal.request.asHttpsURI
 import eu.europa.ec.eudi.openid4vp.internal.request.asHttpsURL
 import eu.europa.ec.eudi.openid4vp.internal.response.AuthorizationRequestErrorCode.INVALID_REQUEST_URI_METHOD
 import eu.europa.ec.eudi.openid4vp.internal.response.DefaultDispatcherTest.Verifier
@@ -130,7 +127,7 @@ class AuthorizationResponseDispatcherTest {
                             deviceAuthAlgorithms = listOf(CoseAlgorithm(-7)),
                         ),
                     ),
-                    client = Client.Preregistered("https%3A%2F%2Fclient.example.org%2Fcb", "Verifier"),
+                    client = WRP.Random.client,
                     nonce = "0S6_WzA2Mj",
                     responseMode = responseMode,
                     state = state,
@@ -309,167 +306,6 @@ class AuthorizationResponseDispatcherTest {
                     )
                     assertIs<DispatchOutcome.VerifierResponse.Accepted>(outcome)
                     assertNotNull(outcome.redirectURI)
-                }
-            }
-
-            test(genState())
-            test()
-        }
-
-        @Test
-        fun `with query`() = runTest {
-            fun test(state: String? = null) {
-                val errorDispatchDetails = ErrorDispatchDetails(
-                    responseMode = ResponseMode.Query("https://respond.here".asHttpsURI().getOrThrow()),
-                    state = state,
-                    nonce = null,
-                    clientId = null,
-                    responseEncryptionSpecification = null,
-                )
-
-                testApplication {
-                    val managedHttpClient = createClient {
-                        install(ContentNegotiation) {
-                            json()
-                        }
-                    }
-
-                    val dispatcher = DefaultDispatcherOverHttp(managedHttpClient)
-                    val outcome = dispatcher.dispatchError(
-                        RequestValidationError.MissingResponseType,
-                        errorDispatchDetails,
-                        EncryptionParameters.DiffieHellman(Base64URL.encode("dummy_apu")),
-                    )
-                    assertIs<DispatchOutcome.RedirectURI>(outcome)
-
-                    val urlParams = Url(outcome.value).parameters
-                    assertEquals(AuthorizationRequestErrorCode.INVALID_REQUEST.code, urlParams["error"])
-                    assertEquals(state, urlParams["state"])
-                }
-            }
-
-            test(genState())
-            test()
-        }
-
-        @Test
-        fun `with query jwt`() = runTest {
-            fun test(state: String? = null) {
-                val errorDispatchDetails = ErrorDispatchDetails(
-                    responseMode = ResponseMode.QueryJwt("https://respond.here".asHttpsURI().getOrThrow()),
-                    state = state,
-                    nonce = null,
-                    clientId = null,
-                    responseEncryptionSpecification = ResponseEncryptionSpecification(
-                        encryptionAlgorithm = Verifier.responseEncryptionKeyPair.algorithm as JWEAlgorithm,
-                        encryptionMethod = EncryptionMethod.parse(
-                            Verifier.metaDataRequestingEncryptedResponse.responseEncryptionMethodsSupported.orEmpty()
-                                .first(),
-                        ),
-                        recipientKey = Verifier.responseEncryptionKeyPair.toPublicJWK(),
-                    ),
-                )
-
-                testApplication {
-                    val managedHttpClient = createClient {
-                        install(ContentNegotiation) {
-                            json()
-                        }
-                    }
-
-                    val dispatcher = DefaultDispatcherOverHttp(managedHttpClient)
-                    val outcome = dispatcher.dispatchError(
-                        MissingScope,
-                        errorDispatchDetails,
-                        EncryptionParameters.DiffieHellman(Base64URL.encode("dummy_apu")),
-                    )
-                    assertIs<DispatchOutcome.RedirectURI>(outcome)
-                    val urlParams = Url(outcome.value).parameters
-                    val responseJwt = urlParams["response"]
-                    assertNotNull(responseJwt)
-                    val claims = parseJwt(responseJwt)
-                    assertEquals(AuthorizationRequestErrorCode.INVALID_REQUEST.code, claims["error"])
-                    assertEquals(state, claims["state"])
-                }
-            }
-
-            test(genState())
-            test()
-        }
-
-        @Test
-        fun `with fragment`() = runTest {
-            fun test(state: String? = null) {
-                val errorDispatchDetails = ErrorDispatchDetails(
-                    responseMode = ResponseMode.Fragment("https://respond.here".asHttpsURI().getOrThrow()),
-                    state = state,
-                    nonce = null,
-                    clientId = null,
-                    responseEncryptionSpecification = null,
-                )
-
-                testApplication {
-                    val managedHttpClient = createClient {
-                        install(ContentNegotiation) {
-                            json()
-                        }
-                    }
-
-                    val dispatcher = DefaultDispatcherOverHttp(managedHttpClient)
-                    val outcome = dispatcher.dispatchError(
-                        MissingResponseType,
-                        errorDispatchDetails,
-                        EncryptionParameters.DiffieHellman(Base64URL.encode("dummy_apu")),
-                    )
-                    assertIs<DispatchOutcome.RedirectURI>(outcome)
-                    val urlParams = Url(outcome.value).fragment.parseUrlEncodedParameters()
-                    assertEquals("invalid_request", urlParams["error"])
-                    assertEquals(state, urlParams["state"])
-                }
-            }
-
-            test(genState())
-            test()
-        }
-
-        @Test
-        fun `with fragment jwt`() = runTest {
-            fun test(state: String? = null) {
-                val errorDispatchDetails = ErrorDispatchDetails(
-                    responseMode = ResponseMode.FragmentJwt("https://respond.here".asHttpsURI().getOrThrow()),
-                    state = state,
-                    nonce = null,
-                    clientId = null,
-                    responseEncryptionSpecification = ResponseEncryptionSpecification(
-                        encryptionAlgorithm = Verifier.responseEncryptionKeyPair.algorithm as JWEAlgorithm,
-                        encryptionMethod = EncryptionMethod.parse(
-                            Verifier.metaDataRequestingEncryptedResponse.responseEncryptionMethodsSupported.orEmpty()
-                                .first(),
-                        ),
-                        recipientKey = Verifier.responseEncryptionKeyPair.toPublicJWK(),
-                    ),
-                )
-
-                testApplication {
-                    val managedHttpClient = createClient {
-                        install(ContentNegotiation) {
-                            json()
-                        }
-                    }
-
-                    val dispatcher = DefaultDispatcherOverHttp(managedHttpClient)
-                    val outcome = dispatcher.dispatchError(
-                        RequestValidationError.MissingResponseUri,
-                        errorDispatchDetails,
-                        EncryptionParameters.DiffieHellman(Base64URL.encode("dummy_apu")),
-                    )
-                    assertIs<DispatchOutcome.RedirectURI>(outcome)
-                    val urlParams = Url(outcome.value).fragment.parseUrlEncodedParameters()
-                    val responseJwt = urlParams["response"]
-                    assertNotNull(responseJwt)
-                    val claims = parseJwt(responseJwt)
-                    assertEquals("invalid_request", claims["error"])
-                    assertEquals(state, claims["state"])
                 }
             }
 

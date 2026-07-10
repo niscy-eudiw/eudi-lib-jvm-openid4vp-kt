@@ -19,7 +19,6 @@ import eu.europa.ec.eudi.openid4vp.AuthorizationRequestError
 import eu.europa.ec.eudi.openid4vp.EncryptionParameters
 import eu.europa.ec.eudi.openid4vp.ErrorDispatchDetails
 import eu.europa.ec.eudi.openid4vp.ResponseMode
-import eu.europa.ec.eudi.openid4vp.internal.response.AuthorizationResponse.*
 
 internal fun AuthorizationRequestError.responseWith(
     di: ErrorDispatchDetails,
@@ -43,20 +42,6 @@ private fun responseWith(
         is ResponseMode.DirectPost -> AuthorizationResponse.DirectPost(mode.responseURI, data)
         is ResponseMode.DirectPostJwt -> AuthorizationResponse.DirectPostJwt(
             mode.responseURI,
-            data,
-            di.responseEncryptionSpecification,
-        )
-
-        is ResponseMode.Fragment -> AuthorizationResponse.Fragment(mode.redirectUri, data)
-        is ResponseMode.FragmentJwt -> AuthorizationResponse.FragmentJwt(
-            mode.redirectUri,
-            data,
-            di.responseEncryptionSpecification,
-        )
-
-        is ResponseMode.Query -> AuthorizationResponse.Query(mode.redirectUri, data)
-        is ResponseMode.QueryJwt -> AuthorizationResponse.QueryJwt(
-            mode.redirectUri,
             data,
             di.responseEncryptionSpecification,
         )

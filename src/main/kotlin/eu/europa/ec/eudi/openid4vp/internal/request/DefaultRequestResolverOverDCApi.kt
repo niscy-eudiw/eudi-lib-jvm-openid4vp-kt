@@ -19,7 +19,8 @@ import eu.europa.ec.eudi.openid4vp.*
 import eu.europa.ec.eudi.openid4vp.internal.JwsJson
 import eu.europa.ec.eudi.openid4vp.internal.ensure
 import eu.europa.ec.eudi.openid4vp.internal.jsonSupport
-import eu.europa.ec.eudi.openid4vp.internal.request.ReceivedRequest.*
+import eu.europa.ec.eudi.openid4vp.internal.request.ReceivedRequest.MultiSigned
+import eu.europa.ec.eudi.openid4vp.internal.request.ReceivedRequest.Signed
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.decodeFromJsonElement
@@ -54,8 +55,11 @@ internal class DefaultRequestResolverOverDCApi private constructor(
 
             exchangeProtocol assertMatches receivedRequest
 
-            val authenticatedRequest = requestAuthenticator.authenticateRequestOverDCApi(origin, receivedRequest)
-            val resolved = requestObjectValidator.validateDCApiRequestObject(origin, authenticatedRequest, receivedRequest.isSigned)
+            val authenticatedRequest = requestAuthenticator.authenticateRequestOverDCApi(receivedRequest)
+            val resolved = requestObjectValidator.validateDCApiRequestObject(
+                origin,
+                authenticatedRequest,
+            )
 
             Resolution.Success(resolved)
         } catch (e: AuthorizationRequestException) {
@@ -75,7 +79,7 @@ internal class DefaultRequestResolverOverDCApi private constructor(
                 Signed(jwsJson)
             }
 
-            else -> Unsigned(jsonSupport.decodeFromJsonElement(requestData))
+            else -> error("Unsigned not supported")
         }
     }
 
@@ -91,11 +95,9 @@ internal class DefaultRequestResolverOverDCApi private constructor(
 
 private infix fun DCApiExchangeProtocol.assertMatches(receivedRequest: ReceivedRequest) = when (this) {
     DCApiExchangeProtocol.UNSIGNED ->
-        ensure(receivedRequest is Unsigned) {
-            asMissMatchException(
-                "Exchange protocol is ${OpenId4VPSpec.DC_API_EXCHANGE_PROTOCOL_UNSIGNED} but request is not Unsigned.",
-            )
-        }
+        throw asMissMatchException(
+            "Exchange protocol is ${OpenId4VPSpec.DC_API_EXCHANGE_PROTOCOL_UNSIGNED} not supported.",
+        )
 
     DCApiExchangeProtocol.SIGNED ->
         ensure(receivedRequest is Signed) {

@@ -356,10 +356,6 @@ private class Wallet(
         val responseUri = when (responseMode) {
             is ResponseMode.DirectPost -> responseMode.responseURI.toString()
             is ResponseMode.DirectPostJwt -> responseMode.responseURI.toString()
-            is ResponseMode.Fragment -> responseMode.redirectUri.toString()
-            is ResponseMode.FragmentJwt -> responseMode.redirectUri.toString()
-            is ResponseMode.Query -> responseMode.redirectUri.toString()
-            is ResponseMode.QueryJwt -> responseMode.redirectUri.toString()
             ResponseMode.DCApi, ResponseMode.DCApiJwt -> error("No uri for response mode $this")
         }
 

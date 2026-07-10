@@ -28,10 +28,6 @@ interface ErrorDispatcher {
     ): DispatchOutcome = when (errorDispatchDetails.responseMode) {
         is ResponseMode.DirectPost -> post(error, errorDispatchDetails, encryptionParameters)
         is ResponseMode.DirectPostJwt -> post(error, errorDispatchDetails, encryptionParameters)
-        is ResponseMode.Query -> encodeRedirectURI(error, errorDispatchDetails, encryptionParameters)
-        is ResponseMode.QueryJwt -> encodeRedirectURI(error, errorDispatchDetails, encryptionParameters)
-        is ResponseMode.Fragment -> encodeRedirectURI(error, errorDispatchDetails, encryptionParameters)
-        is ResponseMode.FragmentJwt -> encodeRedirectURI(error, errorDispatchDetails, encryptionParameters)
         else -> error("Unsupported response mode: ${errorDispatchDetails.responseMode} for error dispatching over HTTP")
     }
 
@@ -43,7 +39,6 @@ interface ErrorDispatcher {
      * either [ResponseMode.DirectPost] or [ResponseMode.DirectPostJwt].
      *
      * @param error The error to dispatch
-     * [ResponseMode.Query], [ResponseMode.QueryJwt], [ResponseMode.Fragment] or [ResponseMode.FragmentJwt]
      * @param errorDispatchDetails Details on how to dispatch the error
      * @return the verifier's response after receiving the authorization response.
      */
@@ -52,24 +47,4 @@ interface ErrorDispatcher {
         errorDispatchDetails: ErrorDispatchDetails,
         encryptionParameters: EncryptionParameters?,
     ): DispatchOutcome.VerifierResponse
-
-    /**
-     * Method forms a suitable authorization response, based on the [error] and the provided [errorDispatchDetails], and then
-     * encodes this response to a URI.
-     * To this URI, the wallet (caller) must redirect its authorization response
-     *
-     * This method is applicable when [errorDispatchDetails] contains a [ErrorDispatchDetails.responseMode] which is one of
-     * [ResponseMode.Query], [ResponseMode.QueryJwt], [ResponseMode.Fragment] or [ResponseMode.FragmentJwt]
-     *
-     * @param error The error to dispatch
-     * [ResponseMode.Query], [ResponseMode.QueryJwt], [ResponseMode.Fragment] or [ResponseMode.FragmentJwt]
-     * @param errorDispatchDetails Details on how to dispatch the error
-     * @return a URI pointing to the verifier to which the wallet(caller) must redirect its response. This URI carries
-     * the authorization response
-     */
-    suspend fun encodeRedirectURI(
-        error: AuthorizationRequestError,
-        errorDispatchDetails: ErrorDispatchDetails,
-        encryptionParameters: EncryptionParameters?,
-    ): DispatchOutcome.RedirectURI
 }

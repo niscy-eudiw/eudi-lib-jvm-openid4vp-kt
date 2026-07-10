@@ -29,7 +29,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import org.bouncycastle.asn1.x500.X500Name
 import org.bouncycastle.asn1.x500.style.BCStyle
-import java.net.URI
 import java.security.cert.X509Certificate
 
 /**
@@ -37,10 +36,6 @@ import java.security.cert.X509Certificate
  */
 sealed interface Client : java.io.Serializable {
 
-    data class Preregistered(val clientId: OriginalClientId, val legalName: String) : Client
-    data class RedirectUri(val clientId: URI) : Client
-    data class DecentralizedIdentifier(val clientId: URI) : Client
-    data class VerifierAttestation(val clientId: OriginalClientId) : Client
     data class X509SanDns(val clientId: OriginalClientId, val cert: X509Certificate) : Client
     data class X509Hash(val clientId: OriginalClientId, val cert: X509Certificate) : Client
     data class Origin(val clientId: OriginalClientId) : Client
@@ -50,10 +45,6 @@ sealed interface Client : java.io.Serializable {
      */
     val id: VerifierId
         get() = when (this) {
-            is Preregistered -> VerifierId(ClientIdPrefix.PreRegistered, clientId)
-            is RedirectUri -> VerifierId(ClientIdPrefix.RedirectUri, clientId.toString())
-            is DecentralizedIdentifier -> VerifierId(ClientIdPrefix.DecentralizedIdentifier, clientId.toString())
-            is VerifierAttestation -> VerifierId(ClientIdPrefix.VerifierAttestation, clientId)
             is X509SanDns -> VerifierId(ClientIdPrefix.X509SanDns, clientId)
             is X509Hash -> VerifierId(ClientIdPrefix.X509Hash, clientId)
             is Origin -> VerifierId(ClientIdPrefix.ORIGIN, clientId)
@@ -78,10 +69,6 @@ fun X509Certificate.legalName(): String? {
  */
 fun Client.legalName(legalName: X509Certificate.() -> String? = X509Certificate::legalName): String? {
     return when (this) {
-        is Preregistered -> this.legalName
-        is RedirectUri -> null
-        is DecentralizedIdentifier -> null
-        is VerifierAttestation -> null
         is X509SanDns -> cert.legalName()
         is X509Hash -> cert.legalName()
         is Origin -> null

@@ -18,96 +18,25 @@ package eu.europa.ec.eudi.openid4vp
 import com.nimbusds.jose.EncryptionMethod
 import com.nimbusds.jose.JWEAlgorithm
 import com.nimbusds.jose.JWSAlgorithm
-import com.nimbusds.jose.JWSVerifier
 import com.nimbusds.jose.crypto.ECDHDecrypter
 import com.nimbusds.jose.jwk.Curve
-import com.nimbusds.jose.jwk.JWKSet
 import com.nimbusds.oauth2.sdk.id.Issuer
 import eu.europa.ec.eudi.openid4vp.OpenId4VPConfig.Companion.SelfIssued
 import eu.europa.ec.eudi.openid4vp.ResponseEncryptionConfiguration.NotSupported
 import eu.europa.ec.eudi.openid4vp.dcql.DCQL
 import java.net.URI
-import java.security.PublicKey
 import java.security.cert.X509Certificate
 import java.time.Clock
 import java.time.Duration
 
-/**
- * The out-of-band knowledge of a Verifier, used in [SupportedClientIdPrefix.Preregistered]
-
- * @param clientId the client id of a trusted verifier
- * @param legalName the name of the trusted verifier
- * @param jarConfig in case, verifier communicates his request using JAR, the signing algorithm
- * that is used to sign his request and his available public keys in form of a JWKSet
- *
- */
-data class PreregisteredClient(
-    val clientId: OriginalClientId,
-    val legalName: String,
-    val jarConfig: Pair<JWSAlgorithm, JWKSet>? = null,
-) {
-    init {
-        if (jarConfig != null) {
-            require(!jarConfig.second.isEmpty) { "JWKSet cannot be empty" }
-            val allKeysArePublic = jarConfig.second.keys.all { it.isPrivate == false }
-            require(allKeysArePublic) { "JWKSet must contain only public keys" }
-        }
-    }
-}
-
 fun interface X509CertificateTrust {
-    fun isTrusted(chain: List<X509Certificate>): Boolean
-}
-
-fun interface LookupPublicKeyByDIDUrl {
-    suspend fun resolveKey(didUrl: URI): PublicKey?
+    suspend fun isTrusted(chain: List<X509Certificate>): Boolean
 }
 
 /**
  * The Client identifier prefix supported (or trusted) by the wallet.
  */
 sealed interface SupportedClientIdPrefix {
-
-    /**
-     * The Client Identifier is known to the Wallet in advance of the Authorization Request.
-     */
-    data class Preregistered(val clients: Map<OriginalClientId, PreregisteredClient>) : SupportedClientIdPrefix {
-        constructor(vararg clients: PreregisteredClient) : this(clients.toList().associateBy { it.clientId })
-    }
-
-    /**
-     * Wallet trusts verifiers that present an authorization request having a redirect URI
-     * equal to the value of the Client Identifier.
-     *
-     * In this prefix, Verifier must NOT sign his request
-     */
-    data object RedirectUri : SupportedClientIdPrefix
-
-    /**
-     * Wallet trusts verifiers that are able to present a client identifier which is a DID
-     *
-     * In this prefix, Verifier must always sign his request (JAR), signed by a key
-     * that can be referenced via the DID
-     *
-     * @param lookup a function for getting the public key of the verifier by
-     * resolving a given DID URL
-     */
-    data class DecentralizedIdentifier(val lookup: LookupPublicKeyByDIDUrl) : SupportedClientIdPrefix
-
-    /**
-     * Wallet trust verifiers that are able to present a signed Verifier Attestation, which
-     * is issued by a party trusted by the Wallet
-     *
-     * In this prefix, Verifier must always sign his request (JAR), having in its JOSE
-     * header a Verifier Attestation JWT under `jwt` claim
-     *
-     * @param trust a function for verifying the digital signature of the Verifier Attestation JWT.
-     * @param clockSkew max acceptable skew between wallet and attestation issuer
-     */
-    data class VerifierAttestation(
-        val trust: JWSVerifier,
-        val clockSkew: Duration = Duration.ofSeconds(15L),
-    ) : SupportedClientIdPrefix
 
     /**
      * Wallet trusts verifiers that are able to present a Client Identifier which is a DNS name and
@@ -137,19 +66,11 @@ sealed interface SupportedClientIdPrefix {
     data class X509Hash(val trust: X509CertificateTrust) : SupportedClientIdPrefix
 
     fun prefix(): ClientIdPrefix = when (this) {
-        is Preregistered -> ClientIdPrefix.PreRegistered
-        RedirectUri -> ClientIdPrefix.RedirectUri
-        is DecentralizedIdentifier -> ClientIdPrefix.DecentralizedIdentifier
-        is VerifierAttestation -> ClientIdPrefix.VerifierAttestation
         is X509SanDns -> ClientIdPrefix.X509SanDns
         is X509Hash -> ClientIdPrefix.X509Hash
     }
 
     fun metadataValue(): String = when (this) {
-        is Preregistered -> OpenId4VPSpec.CLIENT_ID_PREFIX_PRE_REGISTERED
-        RedirectUri -> OpenId4VPSpec.CLIENT_ID_PREFIX_REDIRECT_URI
-        is DecentralizedIdentifier -> OpenId4VPSpec.CLIENT_ID_PREFIX_DECENTRALIZED_IDENTIFIER
-        is VerifierAttestation -> OpenId4VPSpec.CLIENT_ID_PREFIX_VERIFIER_ATTESTATION
         is X509SanDns -> OpenId4VPSpec.CLIENT_ID_PREFIX_X509_SAN_DNS
         is X509Hash -> OpenId4VPSpec.CLIENT_ID_PREFIX_X509_HASH
     }
@@ -179,6 +100,7 @@ sealed interface SupportedTransactionDataType {
  * @param vpFormatsSupported The formats the wallet supports
  * @param supportedTransactionDataTypes the types of Transaction Data that are supported by the wallet
  */
+
 data class VPConfiguration(
     val knownDCQLQueriesPerScope: Map<String, DCQL> = emptyMap(),
     val vpFormatsSupported: VpFormatsSupported,

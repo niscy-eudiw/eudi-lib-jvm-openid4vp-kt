@@ -45,22 +45,12 @@ internal data class UnvalidatedRequestObject(
 )
 
 internal sealed interface ReceivedRequest {
-    data class Unsigned(val requestObject: UnvalidatedRequestObject) : ReceivedRequest
     data class Signed(val jwsJson: JwsJson.Flattened) : ReceivedRequest {
         companion object {
             operator fun invoke(signedJwt: SignedJWT): Signed = Signed(JwsJson.from(signedJwt).getOrThrow())
         }
     }
-
     data class MultiSigned(val jwsJson: JwsJson.General) : ReceivedRequest
-
-    val isSigned: Boolean
-        get() = when (this) {
-            is Signed -> true
-            is MultiSigned -> true
-            else -> false
-        }
-
     companion object
 }
 

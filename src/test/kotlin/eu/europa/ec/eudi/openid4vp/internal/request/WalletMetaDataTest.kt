@@ -94,7 +94,7 @@ class WalletMetaDataTest {
     fun `when clientId does not permit signed Request Objects, request_object_signing_alg_values_supported MUST NOT be included`() =
         runTest {
             val config = OpenId4VPConfig(
-                supportedClientIdPrefixes = listOf(SupportedClientIdPrefix.RedirectUri, SupportedClientIdPrefix.X509SanDns.NoValidation),
+                supportedClientIdPrefixes = listOf(SupportedClientIdPrefix.X509SanDns.NoValidation),
                 vpConfiguration = VPConfiguration(
                     vpFormatsSupported = VpFormatsSupported(
                         VpFormatsSupported.SdJwtVc.HAIP,

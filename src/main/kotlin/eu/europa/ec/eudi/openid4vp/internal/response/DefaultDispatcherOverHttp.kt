@@ -105,38 +105,6 @@ internal class DefaultDispatcherOverHttp(
             else -> DispatchOutcome.VerifierResponse.Rejected
         }
     }
-
-    override suspend fun encodeRedirectURI(
-        request: ResolvedRequestObject,
-        consensus: Consensus,
-        encryptionParameters: EncryptionParameters?,
-    ): DispatchOutcome.RedirectURI {
-        val response = request.responseWith(consensus, encryptionParameters)
-        return encodeRedirectURI(response)
-    }
-
-    override suspend fun encodeRedirectURI(
-        error: AuthorizationRequestError,
-        errorDispatchDetails: ErrorDispatchDetails,
-        encryptionParameters: EncryptionParameters?,
-    ): DispatchOutcome.RedirectURI {
-        val response = error.responseWith(errorDispatchDetails, encryptionParameters)
-        return encodeRedirectURI(response)
-    }
-
-    private fun encodeRedirectURI(
-        response: AuthorizationResponse,
-    ): DispatchOutcome.RedirectURI {
-        val uri = when (response) {
-            is Fragment -> response.encodeRedirectURI()
-            is FragmentJwt -> response.encodeRedirectURI()
-            is Query -> response.encodeRedirectURI()
-            is QueryJwt -> response.encodeRedirectURI()
-            else -> error("Unexpected response $response")
-        }
-
-        return DispatchOutcome.RedirectURI(uri)
-    }
 }
 
 internal fun parametersOf(
@@ -151,31 +119,6 @@ internal fun parametersOf(
 
         else -> DirectPostForm.parametersOf(data)
     }
-
-internal fun Query.encodeRedirectURI(): URI =
-    URLBuilder(redirectUri.toString())
-        .apply {
-            parameters.appendAll(parametersOf(null, data))
-        }.build().toURI()
-
-internal fun QueryJwt.encodeRedirectURI(): URI =
-    URLBuilder(redirectUri.toString())
-        .apply {
-            parameters.appendAll(parametersOf(responseEncryptionSpecification, data))
-        }.build().toURI()
-
-internal fun Parameters.toFragment(): String =
-    entries().flatMap { (key, values) -> values.map { value -> "$key=$value" } }.joinToString("&")
-
-internal fun Fragment.encodeRedirectURI(): URI =
-    URLBuilder(redirectUri.toString()).apply {
-        fragment = parametersOf(null, data).toFragment()
-    }.build().toURI()
-
-internal fun FragmentJwt.encodeRedirectURI(): URI =
-    URLBuilder(redirectUri.toString()).apply {
-        fragment = parametersOf(responseEncryptionSpecification, data).toFragment()
-    }.build().toURI()
 
 /**
  * An object responsible for encoding a [AuthorizationResponsePayload] into

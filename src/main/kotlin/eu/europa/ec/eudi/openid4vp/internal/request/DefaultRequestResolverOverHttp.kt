@@ -69,8 +69,6 @@ enum class RequestUriMethod {
  */
 internal sealed interface UnvalidatedRequest {
 
-    data class Plain(val requestObject: UnvalidatedRequestObject) : UnvalidatedRequest
-
     /**
      * JWT Secured authorization request (JAR)
      */
@@ -135,36 +133,8 @@ internal sealed interface UnvalidatedRequest {
                     PassByReference(clientId(), requestUri, requestUriMethod)
                 }
 
-                else -> notSecured(requestParams)
+                else -> error("Not Supported")
             }
-        }
-
-        /**
-         * Populates a [Plain] from the request parameters of an authorization request
-         */
-        private fun notSecured(requestParams: Map<String, String?>): Plain {
-            fun jsonObject(p: String): JsonObject? =
-                requestParams[p]?.let { Json.parseToJsonElement(it).jsonObject }
-
-            fun jsonArray(p: String): JsonArray? =
-                requestParams[p]?.let { Json.parseToJsonElement(it).jsonArray }
-
-            return Plain(
-                UnvalidatedRequestObject(
-                    responseType = requestParams["response_type"],
-                    dcqlQuery = jsonObject(OpenId4VPSpec.DCQL_QUERY),
-                    scope = requestParams["scope"],
-                    nonce = requestParams["nonce"],
-                    responseMode = requestParams["response_mode"],
-                    clientMetaData = jsonObject("client_metadata"),
-                    clientId = requestParams["client_id"],
-                    responseUri = requestParams[OpenId4VPSpec.RESPONSE_URI],
-                    redirectUri = requestParams["redirect_uri"],
-                    state = requestParams["state"],
-                    transactionData = jsonArray(OpenId4VPSpec.TRANSACTION_DATA)?.let { TransactionDataTO(it) },
-                    verifierInfo = jsonArray(OpenId4VPSpec.VERIFIER_INFO)?.let { VerifierInfoTO(it) },
-                ),
-            )
         }
     }
 }
@@ -236,7 +206,6 @@ private fun dispatchErrorDetailsOrNull(
 ): ErrorDispatchDetails? =
     when (fetchedRequest) {
         is ReceivedRequest.Signed -> dispatchErrorDetailsOrNull(fetchedRequest.jwsJson, openId4VPConfig)
-        is ReceivedRequest.Unsigned -> dispatchErrorDetailsOrNull(fetchedRequest.requestObject, openId4VPConfig)
         is ReceivedRequest.MultiSigned -> error("Multisigned requests not expected over redirects")
     }
 
@@ -290,19 +259,9 @@ private fun UnvalidatedRequestObject.responseMode(): ResponseMode? {
         responseUri?.let {
             runCatchingCancellable { URL(it) }.getOrNull()
         }
-
-    fun UnvalidatedRequestObject.redirectUri(): URI? =
-        redirectUri?.let {
-            runCatchingCancellable { URI.create(it) }.getOrNull()
-        }
-
     return when (responseMode) {
         "direct_post" -> responseUri()?.let { ResponseMode.DirectPost(it) }
         "direct_post.jwt" -> responseUri()?.let { ResponseMode.DirectPostJwt(it) }
-        "query" -> redirectUri()?.let { ResponseMode.Query(it) }
-        "query.jwt" -> redirectUri()?.let { ResponseMode.QueryJwt(it) }
-        null, "fragment" -> redirectUri()?.let { ResponseMode.Fragment(it) }
-        "fragment.jwt" -> redirectUri()?.let { ResponseMode.FragmentJwt(it) }
         else -> null
     }
 }

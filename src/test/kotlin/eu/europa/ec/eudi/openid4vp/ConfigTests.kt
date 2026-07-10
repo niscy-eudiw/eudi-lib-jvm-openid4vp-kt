@@ -16,8 +16,6 @@
 package eu.europa.ec.eudi.openid4vp
 
 import com.nimbusds.jose.JWSAlgorithm
-import com.nimbusds.jose.jwk.JWK
-import com.nimbusds.jose.jwk.JWKSet
 import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.jose.jwk.gen.RSAKeyGenerator
 import org.junit.jupiter.api.assertDoesNotThrow
@@ -66,13 +64,6 @@ class ConfigTests {
 
     @Test
     fun `if jar config for multi-signed requests is MultiSignedRequestsPolicy_ExpectPrefix it must include a supported scheme`() {
-        val preRegSupportedPrefix = SupportedClientIdPrefix.Preregistered(
-            PreregisteredClient(
-                "Verifier",
-                "Verifier",
-                JWSAlgorithm.RS256 to JWKSet(signingKey.toPublicJWK()),
-            ),
-        )
         val x509SanDnsSupportedScheme = SupportedClientIdPrefix.X509SanDns({ _ -> true })
 
         assertFailsWith<IllegalArgumentException> {
@@ -86,26 +77,11 @@ class ConfigTests {
                         ),
                     ),
                 ),
-                supportedClientIdPrefixes = listOf(x509SanDnsSupportedScheme, preRegSupportedPrefix),
+                supportedClientIdPrefixes = listOf(x509SanDnsSupportedScheme),
                 signedRequestConfiguration = SignedRequestConfiguration(
                     supportedAlgorithms = JWSAlgorithm.Family.EC.toList() - JWSAlgorithm.ES256K,
                     supportedRequestUriMethods = SupportedRequestUriMethods.Default,
                     multiSignedRequestsPolicy = MultiSignedRequestsPolicy.Expect(ClientIdPrefix.DecentralizedIdentifier),
-                ),
-            )
-        }
-    }
-
-    @Test
-    fun `if pre-registered client's jar config contains private keys configuration fails`() {
-        val privateJwk = JWK.parse(signingKey.toJSONObject())
-
-        assertFailsWith<IllegalArgumentException> {
-            SupportedClientIdPrefix.Preregistered(
-                PreregisteredClient(
-                    "Verifier",
-                    "Verifier",
-                    JWSAlgorithm.RS256 to JWKSet(privateJwk),
                 ),
             )
         }

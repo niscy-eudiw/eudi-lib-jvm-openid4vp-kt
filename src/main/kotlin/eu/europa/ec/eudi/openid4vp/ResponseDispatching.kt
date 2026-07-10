@@ -103,10 +103,6 @@ interface DispatcherOverHttp {
         when (request.responseMode) {
             is ResponseMode.DirectPost -> post(request, consensus, null)
             is ResponseMode.DirectPostJwt -> post(request, consensus, encryptionParameters)
-            is ResponseMode.Query -> encodeRedirectURI(request, consensus, null)
-            is ResponseMode.QueryJwt -> encodeRedirectURI(request, consensus, encryptionParameters)
-            is ResponseMode.Fragment -> encodeRedirectURI(request, consensus, null)
-            is ResponseMode.FragmentJwt -> encodeRedirectURI(request, consensus, encryptionParameters)
             else -> error("Unsupported response mode: ${request.responseMode} for dispatching over HTTP")
         }
 
@@ -127,26 +123,6 @@ interface DispatcherOverHttp {
         consensus: Consensus,
         encryptionParameters: EncryptionParameters? = null,
     ): DispatchOutcome.VerifierResponse
-
-    /**
-     * Method forms a suitable authorization response, based on the [request] and the provided [consensus], and then
-     * encodes this response to a URI.
-     * To this URI, the wallet (caller) must redirect its authorization response
-     *
-     * This method is applicable when [request] contains a [ResolvedRequestObject.responseMode] which is one of
-     * [ResponseMode.Query], [ResponseMode.QueryJwt], [ResponseMode.Fragment] or [ResponseMode.FragmentJwt]
-     *
-     * @param request The request to reply to. It must contain a [ResolvedRequestObject.responseMode] which is one of
-     * [ResponseMode.Query], [ResponseMode.QueryJwt], [ResponseMode.Fragment] or [ResponseMode.FragmentJwt]
-     * @param consensus Holder's consensus (positive or negative) to this request
-     * @return a URI pointing to the verifier to which the wallet(caller) must redirect its response. This URI carries
-     * the authorization response
-     */
-    suspend fun encodeRedirectURI(
-        request: ResolvedRequestObject,
-        consensus: Consensus,
-        encryptionParameters: EncryptionParameters? = null,
-    ): DispatchOutcome.RedirectURI
 }
 
 /**

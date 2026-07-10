@@ -28,7 +28,6 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseSerializers
 import kotlinx.serialization.json.JsonObject
-import java.net.URI
 import java.net.URL
 
 @JvmInline
@@ -37,6 +36,7 @@ value class Scope private constructor(val value: String) {
         "" -> emptyList()
         else -> value.split(SEPARATOR).map { Scope(it) }
     }
+
     operator fun plus(other: Scope): Scope = Scope("$value$SEPARATOR${other.value}")
     operator fun contains(other: Scope): Boolean {
         val thisFlatten = items().flatMap { it.items() }
@@ -83,7 +83,39 @@ enum class ClientIdPrefix {
     OpenIdFederation,
 
     /**
+     * This value indicates that t /**
+     * This value represents the RFC6749 default behavior,
+     * i.e., the Client Identifier needs to be known to the Wallet in advance of the Authorization Request
+     * The Verifier's metadata is obtained using (RFC7591) or through out-of-band mechanisms.
+     */
+     PreRegistered,
+
+     /**
+     * This value indicates that the Verifier's Redirect URI is also
+     * the value of the Client Identifier. In this case,
+     * the Authorization Request MUST NOT be signed,
+     * the Verifier MAY omit the redirect_uri Authorization Request parameter,
+     * and all Client metadata parameters MUST be passed using the client_metadata parameter
+     */
+     RedirectUri,
+
+     /**
+     * This value indicates that the Client Identifier is an Entity Identifier
+     * defined in OpenID Federation.
+     */
+     OpenIdFederation,
+
+     /**
      * This value indicates that the Client Identifier is a DID
+     */
+     DecentralizedIdentifier,
+
+     /**
+     * This Client Identifier Prefix allows the Verifier
+     * to authenticate using a JWT that is bound to a certain public key
+     */
+     VerifierAttestation,
+     he Client Identifier is a DID
      */
     DecentralizedIdentifier,
 
@@ -205,20 +237,6 @@ data class VerifierId(
  * @see <a href="https://openid.net/specs/oauth-v2-multiple-response-types-1_0.html">https://openid.net/specs/oauth-v2-multiple-response-types-1_0.html</a>
  */
 sealed interface ResponseMode : java.io.Serializable {
-
-    /**
-     * In this mode, Authorization Response parameters are encoded
-     * in the query string added to the redirect_uri when redirecting back to the Client.
-     */
-    data class Query(val redirectUri: URI) : ResponseMode
-    data class QueryJwt(val redirectUri: URI) : ResponseMode
-
-    /**
-     * In this mode, Authorization Response parameters
-     * are encoded in the fragment added to the redirect_uri when redirecting back to the Client.
-     */
-    data class Fragment(val redirectUri: URI) : ResponseMode
-    data class FragmentJwt(val redirectUri: URI) : ResponseMode
     data class DirectPost(val responseURI: URL) : ResponseMode
     data class DirectPostJwt(val responseURI: URL) : ResponseMode
 
@@ -235,10 +253,6 @@ internal fun ResponseMode.requiresEncryption() =
     when (this) {
         is ResponseMode.DirectPost -> false
         is ResponseMode.DirectPostJwt -> true
-        is ResponseMode.Fragment -> false
-        is ResponseMode.FragmentJwt -> true
-        is ResponseMode.Query -> false
-        is ResponseMode.QueryJwt -> true
         ResponseMode.DCApi -> false
         ResponseMode.DCApiJwt -> true
     }

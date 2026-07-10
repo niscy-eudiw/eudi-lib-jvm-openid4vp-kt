@@ -28,7 +28,10 @@ import java.net.URL
 
 internal class RequestObjectValidator(private val openId4VPConfig: OpenId4VPConfig) {
 
-    fun validateDCApiRequestObject(origin: String, request: AuthenticatedRequest, isSigned: Boolean): ResolvedRequestObject {
+    fun validateDCApiRequestObject(
+        origin: String,
+        request: AuthenticatedRequest,
+    ): ResolvedRequestObject {
         val (client, requestObject) = request
 
         ensureVpTokenResponseType(requestObject)
@@ -40,9 +43,7 @@ internal class RequestObjectValidator(private val openId4VPConfig: OpenId4VPConf
         val clientMetaData = optionalClientMetaData(responseMode, query, requestObject)
         val transactionData = optionalTransactionData(requestObject, query)
         val verifierInfo = optionalVerifierInfo(query, requestObject)
-        if (isSigned) {
-            requireExpectedOrigins(origin, requestObject)
-        }
+        requireExpectedOrigins(origin, requestObject)
 
         return ResolvedRequestObject(
             client = client.toClient(),
@@ -189,23 +190,6 @@ internal class RequestObjectValidator(private val openId4VPConfig: OpenId4VPConf
         client: AuthenticatedClient,
         unvalidated: UnvalidatedRequestObject,
     ): ResponseMode {
-        fun requiredRedirectUriAndNotProvidedResponseUri(): URI {
-            ensure(unvalidated.responseUri == null) { ResponseUriMustNotBeProvided.asException() }
-            // Redirect URI can be omitted in case of RedirectURI
-            // and use clientId instead
-            val redirectUri = unvalidated.redirectUri?.asHttpsURI { InvalidRedirectUri.asException() }?.getOrThrow()
-            return when (client) {
-                is AuthenticatedClient.RedirectUri -> {
-                    ensure(redirectUri == null || client.clientId == redirectUri) {
-                        InvalidRedirectUri.asException()
-                    }
-                    client.clientId
-                }
-
-                else -> ensureNotNull(redirectUri) { MissingRedirectUri.asException() }
-            }
-        }
-
         fun requiredResponseUriAndNotProvidedRedirectUri(): URL {
             ensure(unvalidated.redirectUri == null) { RedirectUriMustNotBeProvided.asException() }
             val uri = unvalidated.responseUri
@@ -216,54 +200,16 @@ internal class RequestObjectValidator(private val openId4VPConfig: OpenId4VPConf
         val responseMode = when (unvalidated.responseMode) {
             "direct_post" -> requiredResponseUriAndNotProvidedRedirectUri().let { ResponseMode.DirectPost(it) }
             "direct_post.jwt" -> requiredResponseUriAndNotProvidedRedirectUri().let { ResponseMode.DirectPostJwt(it) }
-            "query" -> requiredRedirectUriAndNotProvidedResponseUri().let { ResponseMode.Query(it) }
-            "query.jwt" -> requiredRedirectUriAndNotProvidedResponseUri().let { ResponseMode.QueryJwt(it) }
-            null, "fragment" -> requiredRedirectUriAndNotProvidedResponseUri().let { ResponseMode.Fragment(it) }
-            "fragment.jwt" -> requiredRedirectUriAndNotProvidedResponseUri().let { ResponseMode.FragmentJwt(it) }
             else -> throw UnsupportedResponseMode(unvalidated.responseMode).asException()
         }
 
         val uri = responseMode.uri()
         when (client) {
-            is AuthenticatedClient.Preregistered -> Unit
-
-            is AuthenticatedClient.RedirectUri -> ensure(client.clientId == uri) {
-                UnsupportedResponseMode("$responseMode doesn't match ${client.clientId}").asException()
-            }
-
-            is AuthenticatedClient.DecentralizedIdentifier -> Unit
-
-            is AuthenticatedClient.VerifierAttestation -> {
-                val allowedUris = when (responseMode) {
-                    is ResponseMode.Query,
-                    is ResponseMode.QueryJwt,
-                    is ResponseMode.Fragment,
-                    is ResponseMode.FragmentJwt,
-                    -> client.claims.redirectUris
-
-                    ResponseMode.DCApi,
-                    ResponseMode.DCApiJwt,
-                    -> error("Unsupported response mode $responseMode")
-
-                    is ResponseMode.DirectPost,
-                    is ResponseMode.DirectPostJwt,
-                    -> client.claims.responseUris
-                }
-                if (!allowedUris.isNullOrEmpty()) {
-                    ensure(uri.toString() in allowedUris) {
-                        UnsupportedResponseMode("$responseMode use a URI that is not included in attested URIs $allowedUris").asException()
-                    }
-                }
-            }
-
             is AuthenticatedClient.X509SanDns -> ensure(client.clientId == uri.host) {
                 UnsupportedResponseMode("$responseMode host doesn't match ${client.clientId}").asException()
             }
 
             is AuthenticatedClient.X509Hash -> Unit
-
-            is AuthenticatedClient.Origin ->
-                throw IllegalStateException("Origin client is not supported for response_mode: $responseMode")
         }
 
         return responseMode
@@ -362,26 +308,13 @@ internal class RequestObjectValidator(private val openId4VPConfig: OpenId4VPConf
 
 private fun AuthenticatedClient.toClient(): Client =
     when (this) {
-        is AuthenticatedClient.Preregistered -> Client.Preregistered(
-            preregisteredClient.clientId,
-            preregisteredClient.legalName,
-        )
-
-        is AuthenticatedClient.RedirectUri -> Client.RedirectUri(clientId)
-        is AuthenticatedClient.DecentralizedIdentifier -> Client.DecentralizedIdentifier(client.uri)
-        is AuthenticatedClient.VerifierAttestation -> Client.VerifierAttestation(clientId)
         is AuthenticatedClient.X509SanDns -> Client.X509SanDns(clientId, chain[0])
         is AuthenticatedClient.X509Hash -> Client.X509Hash(clientId, chain[0])
-        is AuthenticatedClient.Origin -> Client.Origin(clientId)
     }
 
 private fun ResponseMode.uri(): URI = when (this) {
     is ResponseMode.DirectPost -> responseURI.toURI()
     is ResponseMode.DirectPostJwt -> responseURI.toURI()
-    is ResponseMode.Fragment -> redirectUri
-    is ResponseMode.FragmentJwt -> redirectUri
-    is ResponseMode.Query -> redirectUri
-    is ResponseMode.QueryJwt -> redirectUri
     ResponseMode.DCApi,
     ResponseMode.DCApiJwt,
     -> error("No uri for response mode $this")
@@ -402,7 +335,7 @@ private fun TransactionData.SdJwtVc.ensureSupported(supportedTransactionDataType
 
     val hashAlgorithms = this.hashAlgorithmsOrDefault
     val supportedHashAlgorithms = supportedType.hashAlgorithms
-    require(supportedHashAlgorithms.intersect(hashAlgorithms).isNotEmpty()) {
+    require(supportedHashAlgorithms.intersect(hashAlgorithms.toSet()).isNotEmpty()) {
         "Unsupported Transaction Data '${OpenId4VPSpec.TRANSACTION_DATA_HASH_ALGORITHMS}': '$hashAlgorithms'"
     }
 }

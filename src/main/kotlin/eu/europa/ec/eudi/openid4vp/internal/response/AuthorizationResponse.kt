@@ -21,7 +21,6 @@ import eu.europa.ec.eudi.openid4vp.internal.response.AuthorizationResponse.DCApi
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
-import java.net.URI
 import java.net.URL
 
 /**
@@ -175,66 +174,6 @@ internal sealed interface AuthorizationResponse : java.io.Serializable {
         }
     }
 
-    /**
-     * An authorization response to be communicated to verifier/RP via redirect using
-     * query parameters
-     * @param redirectUri the verifier/RP URI where the response will be redirected to
-     * @param data the contents of the authorization request
-     */
-    data class Query(
-        val redirectUri: URI,
-        val data: AuthorizationResponsePayload,
-    ) : AuthorizationResponse
-
-    /**
-     * An authorization response to be communicated to verifier/RP via redirect using
-     * query parameters and authorization response encryption
-     * @param redirectUri the verifier/RP URI where the response will be redirected to
-     * @param data the contents of the authorization request
-     * @param responseEncryptionSpecification the verifier/RP's requirements for authorization response encryption
-     */
-    data class QueryJwt(
-        val redirectUri: URI,
-        val data: AuthorizationResponsePayload,
-        val responseEncryptionSpecification: ResponseEncryptionSpecification?,
-    ) : AuthorizationResponse {
-        init {
-            if (data !is AuthorizationResponsePayload.InvalidRequest) {
-                requireNotNull(responseEncryptionSpecification)
-            }
-        }
-    }
-
-    /**
-     * An authorization response to be communicated to verifier/RP via redirect using
-     * fragment
-     * @param redirectUri the verifier/RP URI where the response will be redirected to
-     * @param data the contents of the authorization request
-     */
-    data class Fragment(
-        val redirectUri: URI,
-        val data: AuthorizationResponsePayload,
-    ) : AuthorizationResponse
-
-    /**
-     * An authorization response to be communicated to verifier/RP via redirect using
-     * fragment and authorization response encryption
-     * @param redirectUri the verifier/RP URI where the response will be redirected to
-     * @param data the contents of the authorization request
-     * @param responseEncryptionSpecification the verifier/RP's requirements for authorization response encryption
-     */
-    data class FragmentJwt(
-        val redirectUri: URI,
-        val data: AuthorizationResponsePayload,
-        val responseEncryptionSpecification: ResponseEncryptionSpecification?,
-    ) : AuthorizationResponse {
-        init {
-            if (data !is AuthorizationResponsePayload.InvalidRequest) {
-                requireNotNull(responseEncryptionSpecification)
-            }
-        }
-    }
-
     data class DCApi(
         val data: AuthorizationResponsePayload,
     ) : AuthorizationResponse
@@ -292,21 +231,6 @@ private fun ResolvedRequestObject.responseWith(
             data,
             checkNotNull(responseEncryptionSpecification),
         )
-
-        is ResponseMode.Fragment -> AuthorizationResponse.Fragment(mode.redirectUri, data)
-        is ResponseMode.FragmentJwt -> AuthorizationResponse.FragmentJwt(
-            mode.redirectUri,
-            data,
-            checkNotNull(responseEncryptionSpecification),
-        )
-
-        is ResponseMode.Query -> AuthorizationResponse.Query(mode.redirectUri, data)
-        is ResponseMode.QueryJwt -> AuthorizationResponse.QueryJwt(
-            mode.redirectUri,
-            data,
-            checkNotNull(responseEncryptionSpecification),
-        )
-
         ResponseMode.DCApi -> DCApi(data)
         ResponseMode.DCApiJwt -> DCApiJwt(
             data,
