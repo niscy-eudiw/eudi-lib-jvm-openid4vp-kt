@@ -267,19 +267,19 @@ data class SupervisoryAuthority(
 
 @Serializable
 @JvmInline
-value class CertificatePolicy(val oid: String) {
-    companion object {
-        // ETSI Certificate Policy for Wallet Relying Parties
-        val WalletRelyingParty = CertificatePolicy(ETSI119475.WALLET_RELYING_PARTY_CERTIFICATE_POLICY_OID)
+value class CertificatePolicies(val policies: List<CertificatePolicy>) : Iterable<CertificatePolicy> by policies {
+    init {
+        require(policies.isNotEmpty())
+        require(CertificatePolicy.WalletRelyingParty in policies)
     }
 }
 
 @Serializable
 @JvmInline
-value class CertificatePolicies(val policies: List<CertificatePolicy>) : Iterable<CertificatePolicy> by policies {
-    init {
-        require(policies.isNotEmpty())
-        require(CertificatePolicy.WalletRelyingParty in policies)
+value class CertificatePolicy(val oid: String) {
+    companion object {
+        // ETSI Certificate Policy for Wallet Relying Parties
+        val WalletRelyingParty = CertificatePolicy(ETSI119475.WALLET_RELYING_PARTY_CERTIFICATE_POLICY_OID)
     }
 }
 
@@ -319,14 +319,6 @@ value class ProvidedAttestations(val attestations: List<Credential>) : Iterable<
 }
 
 @Serializable
-@JvmInline
-value class Credentials(val credentials: List<Credential>) : Iterable<Credential> by credentials {
-    init {
-        require(credentials.isNotEmpty())
-    }
-}
-
-@Serializable
 data class Credential(
     @Required @SerialName(ETSI119475.CREDENTIAL_FORMAT_CLAIM) val format: Format,
     @Required @SerialName(ETSI119475.CREDENTIAL_META_CLAIM) val meta: JsonObject,
@@ -358,6 +350,14 @@ data class Claim(
 value class Values(val values: List<JsonPrimitive>) : Iterable<JsonPrimitive> by values {
     init {
         require(values.isNotEmpty() && values.none { JsonNull == it })
+    }
+}
+
+@Serializable
+@JvmInline
+value class Credentials(val credentials: List<Credential>) : Iterable<Credential> by credentials {
+    init {
+        require(credentials.isNotEmpty())
     }
 }
 
