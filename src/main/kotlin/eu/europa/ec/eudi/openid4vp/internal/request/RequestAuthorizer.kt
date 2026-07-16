@@ -52,7 +52,7 @@ import java.security.cert.X509Certificate
  */
 internal fun interface RequestAuthorizer {
 
-    fun authorize(request: ResolvedRequestObject)
+    suspend fun authorize(request: ResolvedRequestObject)
 
     companion object {
         operator fun invoke(

@@ -207,8 +207,37 @@ internal class DefaultRequestResolverOverHttp(
                 return Resolution.Invalid(e.error, dispatchDetails)
             }
 
-        return Resolution.Success(resolved)
+        val resolution =
+            when (openId4VPConfig.registrationCertificatePolicy) {
+                null -> Resolution.Success(resolved)
+                else -> {
+                    try {
+                        Resolution.Success(
+                            resolved.apply { authorizeRequest(this) },
+                        )
+                    } catch (e: AuthorizationRequestException) {
+                        when (val error = e.error) {
+                            is AuthorizationPolicyValidationError.Recoverable ->
+                                Resolution.Success(resolved).withRecoverableErrors(error)
+
+                            else ->
+                                Resolution.Invalid(error, resolved.errorDispatchDetails())
+                        }
+                    }
+                }
+            }
+
+        return resolution
     }
+
+    private fun ResolvedRequestObject.errorDispatchDetails(): ErrorDispatchDetails =
+        ErrorDispatchDetails(
+            responseMode = responseMode,
+            nonce = nonce,
+            state = state,
+            clientId = client.id,
+            responseEncryptionSpecification = responseEncryptionSpecification,
+        )
 
     private fun validateRequestObject(authenticatedRequest: AuthenticatedRequest): ResolvedRequestObject {
         val requestValidator = RequestObjectValidator(openId4VPConfig)
@@ -224,6 +253,11 @@ internal class DefaultRequestResolverOverHttp(
     private suspend fun authenticateRequest(receivedRequest: ReceivedRequest): AuthenticatedRequest {
         val requestAuthenticator = RequestAuthenticator(openId4VPConfig)
         return requestAuthenticator.authenticateRequestOverHttp(receivedRequest)
+    }
+
+    private suspend fun authorizeRequest(resolvedRequest: ResolvedRequestObject) {
+        val requestAuthorizer = RequestAuthorizer(openId4VPConfig.registrationCertificatePolicy!!)
+        requestAuthorizer.authorize(resolvedRequest)
     }
 }
 

@@ -392,7 +392,7 @@ enum class ErrorDispatchPolicy : java.io.Serializable {
  */
 data class RegistrationCertificatePolicy(
     val trust: X509CertificateTrust,
-    val apply: (accessCertificate: X509Certificate, registrationCertificate: SignedJWT, dcql: DCQL) -> List<PolicyViolation>,
+    val apply: suspend (accessCertificate: X509Certificate, registrationCertificate: SignedJWT, dcql: DCQL) -> List<PolicyViolation>,
 )
 
 /**
@@ -420,6 +420,7 @@ data class OpenId4VPConfig(
     val vpFormatsSupported: VpFormatsSupported,
     val supportedTransactionDataTypes: List<SupportedTransactionDataType> = emptyList(),
     val clock: Clock = Clock.systemDefaultZone(),
+    val registrationCertificatePolicy: RegistrationCertificatePolicy? = null,
     val supportedClientIdPrefixes: List<SupportedClientIdPrefix>,
     val errorDispatchPolicy: ErrorDispatchPolicy = ErrorDispatchPolicy.OnlyAuthenticatedClients,
 ) {
@@ -451,6 +452,7 @@ data class OpenId4VPConfig(
         supportedTransactionDataTypes: List<SupportedTransactionDataType> = emptyList(),
         clock: Clock = Clock.systemDefaultZone(),
         errorDispatchPolicy: ErrorDispatchPolicy = ErrorDispatchPolicy.OnlyAuthenticatedClients,
+        registrationCertificatePolicy: RegistrationCertificatePolicy? = null,
         vararg supportedClientIdPrefixes: SupportedClientIdPrefix,
     ) : this(
         issuer = issuer,
@@ -462,6 +464,7 @@ data class OpenId4VPConfig(
         clock = clock,
         supportedClientIdPrefixes = supportedClientIdPrefixes.toList(),
         errorDispatchPolicy = errorDispatchPolicy,
+        registrationCertificatePolicy = registrationCertificatePolicy,
     )
 
     companion object {

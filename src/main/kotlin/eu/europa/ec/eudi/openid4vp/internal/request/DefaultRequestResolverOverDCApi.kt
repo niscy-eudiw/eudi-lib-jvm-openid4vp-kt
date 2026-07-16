@@ -45,22 +45,43 @@ internal enum class DCApiExchangeProtocol {
 internal class DefaultRequestResolverOverDCApi private constructor(
     private val requestAuthenticator: RequestAuthenticator,
     private val requestObjectValidator: RequestObjectValidator,
+    private val requestAuthorizer: RequestAuthorizer?,
 ) : AuthorizationRequestOverDCApiResolver {
 
-    override suspend fun resolveRequestObject(protocol: String, origin: String, requestData: JsonObject): Resolution =
-        try {
+    override suspend fun resolveRequestObject(protocol: String, origin: String, requestData: JsonObject): Resolution {
+        val resolved = try {
             val receivedRequest = makeReceivedRequest(requestData)
             val exchangeProtocol = DCApiExchangeProtocol.from(protocol)
 
             exchangeProtocol assertMatches receivedRequest
 
             val authenticatedRequest = requestAuthenticator.authenticateRequestOverDCApi(origin, receivedRequest)
-            val resolved = requestObjectValidator.validateDCApiRequestObject(origin, authenticatedRequest, receivedRequest.isSigned)
-
-            Resolution.Success(resolved)
+            requestObjectValidator.validateDCApiRequestObject(origin, authenticatedRequest, receivedRequest.isSigned)
         } catch (e: AuthorizationRequestException) {
-            Resolution.Invalid(e.error, null)
+            return Resolution.Invalid(e.error, null)
         }
+
+        val resolution =
+            when (requestAuthorizer) {
+                null -> Resolution.Success(resolved)
+                else -> {
+                    try {
+                        Resolution.Success(
+                            resolved.apply { requestAuthorizer.authorize(this) },
+                        )
+                    } catch (e: AuthorizationRequestException) {
+                        when (val error = e.error) {
+                            is AuthorizationPolicyValidationError.Recoverable ->
+                                Resolution.Success(resolved).withRecoverableErrors(error)
+
+                            else -> Resolution.Invalid(error, null)
+                        }
+                    }
+                }
+            }
+
+        return resolution
+    }
 
     private fun makeReceivedRequest(requestData: JsonObject): ReceivedRequest {
         val requestValue = requestData["request"]
@@ -82,10 +103,14 @@ internal class DefaultRequestResolverOverDCApi private constructor(
     companion object {
         operator fun invoke(
             openId4VPConfig: OpenId4VPConfig,
-        ): DefaultRequestResolverOverDCApi = DefaultRequestResolverOverDCApi(
-            requestAuthenticator = RequestAuthenticator(openId4VPConfig),
-            requestObjectValidator = RequestObjectValidator(openId4VPConfig),
-        )
+        ): DefaultRequestResolverOverDCApi {
+            val wrpRcPolicy = openId4VPConfig.registrationCertificatePolicy
+            return DefaultRequestResolverOverDCApi(
+                requestAuthenticator = RequestAuthenticator(openId4VPConfig),
+                requestObjectValidator = RequestObjectValidator(openId4VPConfig),
+                requestAuthorizer = if (wrpRcPolicy != null) RequestAuthorizer(wrpRcPolicy) else null,
+            )
+        }
     }
 }
 
